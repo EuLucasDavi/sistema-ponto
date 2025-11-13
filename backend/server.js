@@ -16,7 +16,7 @@ const app = express();
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'https://sistema-ponto-frontend.vercel.app',  // Seu frontend na Vercel
+    'https://sistema-ponto-beta.vercel.app',  // Seu frontend na Vercel
     'https://sistema-ponto-frontend-*.vercel.app',
     'https://*.vercel.app'
   ],
