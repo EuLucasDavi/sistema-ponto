@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: sistema-ponto-backend
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: MONGODB_URI
+        value: mongodb+srv://sistema-ponto-admin:SenhaSegura123!@cluster-sistema-ponto.xxxxx.mongodb.net/sistema_ponto?retryWrites=true&w=majority
+      - key: JWT_SECRET
+        value: seu_jwt_secret_super_seguro_producao_2024_sistema_ponto
+      - key: NODE_ENV
+        value: production
