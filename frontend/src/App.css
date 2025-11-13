@@ -553,6 +553,7 @@ body {
   border-radius: 10px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   margin-bottom: 25px;
+  margin-top: 25px;
   border-left: 4px solid #007bff;
 }
 
@@ -651,4 +652,67 @@ body {
   color: #6c757d;
   margin-bottom: 25px;
   font-size: 16px;
+}
+
+/* Estilos para gerenciamento de usuários */
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.btn-small {
+  padding: 4px 8px;
+  font-size: 12px;
+  margin: 2px;
+}
+
+.btn-warning {
+  background-color: #ffc107;
+  color: #212529;
+  border: none;
+}
+
+.btn-warning:hover {
+  background-color: #e0a800;
+  color: #212529;
+}
+
+.badge-admin {
+  background-color: #dc3545;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+.department-badge {
+  background-color: #e9ecef;
+  color: #495057;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.text-muted {
+  color: #6c757d !important;
+  font-style: italic;
+}
+
+.success-message {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 12px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  border: 1px solid #c3e6cb;
+}
+
+/* Ajustes para tabelas */
+.data-table td {
+  vertical-align: middle;
+}
+
+.data-table .btn {
+  margin: 2px;
 }

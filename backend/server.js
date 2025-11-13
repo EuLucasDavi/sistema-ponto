@@ -262,9 +262,13 @@ app.post('/api/register', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+// ==================== ROTAS COMPLETAS DE USUÁRIOS ====================
+
 // Listar usuários (apenas admin)
 app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    console.log('👥 Buscando lista de usuários...');
+    
     const users = await db.collection('users')
       .find({}, { projection: { password: 0 } }) // Excluir password
       .sort({ username: 1 })
@@ -286,8 +290,179 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
       })
     );
 
+    console.log(`✅ Encontrados ${usersWithEmployees.length} usuários`);
     res.json(usersWithEmployees);
   } catch (error) {
+    console.error('❌ Erro ao buscar usuários:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Editar usuário (apenas admin)
+app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { username, employee_id, role, password } = req.body;
+
+  try {
+    console.log('✏️ Editando usuário:', id);
+    
+    // Verificar se o usuário existe
+    const existingUser = await db.collection('users').findOne({ 
+      _id: new ObjectId(id) 
+    });
+    
+    if (!existingUser) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    // Verificar se username já existe (excluindo o próprio usuário)
+    if (username && username !== existingUser.username) {
+      const userWithSameUsername = await db.collection('users').findOne({ 
+        username, 
+        _id: { $ne: new ObjectId(id) } 
+      });
+      
+      if (userWithSameUsername) {
+        return res.status(400).json({ error: 'Username já está em uso' });
+      }
+    }
+
+    // Verificar se employee_id é válido
+    if (employee_id && !ObjectId.isValid(employee_id)) {
+      return res.status(400).json({ error: 'ID do funcionário inválido' });
+    }
+
+    // Verificar se funcionário existe
+    if (employee_id) {
+      const employee = await db.collection('employees').findOne({ 
+        _id: new ObjectId(employee_id) 
+      });
+      if (!employee) {
+        return res.status(400).json({ error: 'Funcionário não encontrado' });
+      }
+    }
+
+    // Preparar dados para atualização
+    const updateData = {
+      updated_at: new Date()
+    };
+
+    if (username) updateData.username = username;
+    if (employee_id) updateData.employee_id = new ObjectId(employee_id);
+    if (role) updateData.role = role;
+    
+    // Atualizar senha se fornecida
+    if (password) {
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    // Se employee_id for null, remover o vínculo
+    if (employee_id === null) {
+      updateData.employee_id = null;
+    }
+
+    const result = await db.collection('users').updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    // Buscar usuário atualizado
+    const updatedUser = await db.collection('users').findOne(
+      { _id: new ObjectId(id) },
+      { projection: { password: 0 } }
+    );
+
+    // Buscar dados do funcionário vinculado
+    let employee = null;
+    if (updatedUser.employee_id) {
+      employee = await db.collection('employees').findOne({ 
+        _id: updatedUser.employee_id 
+      });
+    }
+
+    console.log('✅ Usuário atualizado com sucesso');
+    res.json({
+      ...updatedUser,
+      employee: employee
+    });
+  } catch (error) {
+    console.error('❌ Erro ao editar usuário:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Excluir usuário (apenas admin)
+app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    console.log('🗑️ Excluindo usuário:', id);
+    
+    // Verificar se é o próprio usuário admin
+    const userToDelete = await db.collection('users').findOne({ 
+      _id: new ObjectId(id) 
+    });
+    
+    if (!userToDelete) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    // Impedir que o admin principal seja excluído
+    if (userToDelete.username === 'admin') {
+      return res.status(400).json({ error: 'Não é possível excluir o usuário admin principal' });
+    }
+
+    const result = await db.collection('users').deleteOne({ 
+      _id: new ObjectId(id) 
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    console.log('✅ Usuário excluído com sucesso');
+    res.json({ message: 'Usuário excluído com sucesso' });
+  } catch (error) {
+    console.error('❌ Erro ao excluir usuário:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Desvincular funcionário de usuário (apenas admin)
+app.put('/api/users/:id/unlink-employee', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    console.log('🔗 Desvinculando funcionário do usuário:', id);
+    
+    const result = await db.collection('users').updateOne(
+      { _id: new ObjectId(id) },
+      { 
+        $set: { 
+          employee_id: null,
+          updated_at: new Date()
+        } 
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    // Buscar usuário atualizado
+    const updatedUser = await db.collection('users').findOne(
+      { _id: new ObjectId(id) },
+      { projection: { password: 0 } }
+    );
+
+    console.log('✅ Funcionário desvinculado com sucesso');
+    res.json(updatedUser);
+  } catch (error) {
+    console.error('❌ Erro ao desvincular funcionário:', error);
     res.status(500).json({ error: error.message });
   }
 });
