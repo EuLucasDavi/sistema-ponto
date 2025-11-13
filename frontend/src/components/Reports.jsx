@@ -9,6 +9,7 @@ const Reports = () => {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchEmployees();
@@ -24,20 +25,24 @@ const Reports = () => {
 
   const fetchEmployees = async () => {
     try {
+      setError('');
       const response = await axios.get('/api/employees');
       setEmployees(response.data);
     } catch (error) {
       console.error('Erro ao buscar funcionários:', error);
+      setError('Erro ao carregar funcionários');
     }
   };
 
   const generateTimesheetPDF = () => {
     if (!selectedEmployee) {
-      alert('Selecione um funcionário');
+      setError('Selecione um funcionário');
       return;
     }
 
     setLoading(true);
+    setError('');
+
     const url = `/api/reports/timesheet/${selectedEmployee}/pdf?start_date=${startDate}&end_date=${endDate}`;
     
     // Abrir em nova aba
@@ -45,7 +50,7 @@ const Reports = () => {
     
     // Verificar se o popup foi bloqueado
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-      alert('Popup bloqueado! Por favor, permita popups para este site para gerar o PDF.');
+      setError('Popup bloqueado! Permita popups para este site.');
     }
     
     setLoading(false);
@@ -53,12 +58,14 @@ const Reports = () => {
 
   const generatePayrollExcel = () => {
     setLoading(true);
+    setError('');
+
     const url = `/api/reports/payroll/excel?month=${month}&year=${year}`;
     
     const newWindow = window.open(url, '_blank');
     
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-      alert('Popup bloqueado! Por favor, permita popups para este site para gerar o Excel.');
+      setError('Popup bloqueado! Permita popups para este site.');
     }
     
     setLoading(false);
@@ -75,6 +82,12 @@ const Reports = () => {
         <h1>📈 Relatórios</h1>
         <p>Gere relatórios em PDF e Excel</p>
       </div>
+
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
 
       <div className="reports-grid">
         {/* Espelho de Ponto */}
@@ -169,18 +182,18 @@ const Reports = () => {
         </div>
       </div>
 
-      <div style={{ marginTop: '30px', padding: '20px', background: '#fff3cd', borderRadius: '10px', border: '1px solid #ffeaa7' }}>
+      <div className="info-card">
         <h3>ℹ️ Informações sobre os Relatórios</h3>
-        <div style={{ marginTop: '15px' }}>
+        <div className="info-content">
           <p><strong>Espelho de Ponto (PDF):</strong></p>
-          <ul style={{ paddingLeft: '20px', marginBottom: '15px' }}>
+          <ul>
             <li>Lista todos os registros de ponto do período</li>
             <li>Mostra data, hora e tipo de registro</li>
             <li>Inclui resumo com totais</li>
           </ul>
           
           <p><strong>Folha de Pagamento (Excel):</strong></p>
-          <ul style={{ paddingLeft: '20px' }}>
+          <ul>
             <li>Calcula salário proporcional baseado nos dias trabalhados</li>
             <li>Inclui todos os funcionários</li>
             <li>Formatação profissional com totais</li>

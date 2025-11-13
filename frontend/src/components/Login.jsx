@@ -5,9 +5,7 @@ import { useNavigate } from 'react-router-dom';
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { login, user } = useAuth();
+  const { login, user, loading, error, clearError } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,28 +16,28 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    clearError();
+    
+    if (!username || !password) {
+      return;
+    }
 
     const result = await login(username, password);
     
     if (result.success) {
       navigate('/');
-    } else {
-      setError(result.error);
     }
-    
-    setLoading(false);
   };
 
   return (
     <div className="login-container">
       <form onSubmit={handleSubmit} className="login-form">
         <h1>🔐 Login</h1>
+        <p className="login-subtitle">Sistema de Ponto Eletrônico</p>
         
         {error && (
           <div className="error-message">
-            {error}
+            ❌ {error}
           </div>
         )}
 
@@ -52,6 +50,7 @@ const Login = () => {
             placeholder="Digite seu usuário"
             required
             disabled={loading}
+            autoFocus
           />
         </div>
 
@@ -70,9 +69,16 @@ const Login = () => {
         <button 
           type="submit" 
           className="btn btn-primary login-btn"
-          disabled={loading}
+          disabled={loading || !username || !password}
         >
-          {loading ? 'Entrando...' : 'Entrar'}
+          {loading ? (
+            <>
+              <span className="loading-spinner"></span>
+              Entrando...
+            </>
+          ) : (
+            'Entrar'
+          )}
         </button>
       </form>
     </div>

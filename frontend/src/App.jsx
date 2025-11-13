@@ -10,7 +10,16 @@ import Layout from './components/Layout';
 import './App.css';
 
 function ProtectedRoute({ children }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="loading">Carregando...</div>
+      </div>
+    );
+  }
+  
   return user ? children : <Navigate to="/login" />;
 }
 
@@ -18,37 +27,40 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={
-            <ProtectedRoute>
-              <Layout>
-                <Dashboard />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/employees" element={
-            <ProtectedRoute>
-              <Layout>
-                <EmployeeManagement />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/time-clock" element={
-            <ProtectedRoute>
-              <Layout>
-                <TimeClock />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/reports" element={
-            <ProtectedRoute>
-              <Layout>
-                <Reports />
-              </Layout>
-            </ProtectedRoute>
-          } />
-        </Routes>
+        <div className="app">
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/employees" element={
+              <ProtectedRoute>
+                <Layout>
+                  <EmployeeManagement />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/time-clock" element={
+              <ProtectedRoute>
+                <Layout>
+                  <TimeClock />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/reports" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Reports />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </div>
       </Router>
     </AuthProvider>
   );

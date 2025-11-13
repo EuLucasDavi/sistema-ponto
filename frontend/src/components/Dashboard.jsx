@@ -8,6 +8,7 @@ const Dashboard = () => {
     recentEmployees: []
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchDashboardStats();
@@ -15,17 +16,23 @@ const Dashboard = () => {
 
   const fetchDashboardStats = async () => {
     try {
+      setError('');
       const response = await axios.get('/api/dashboard/stats');
       setStats(response.data);
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
+      setError('Erro ao carregar dashboard');
     } finally {
       setLoading(false);
     }
   };
 
   if (loading) {
-    return <div className="loading">Carregando dashboard...</div>;
+    return (
+      <div className="container">
+        <div className="loading">Carregando dashboard...</div>
+      </div>
+    );
   }
 
   return (
@@ -34,6 +41,12 @@ const Dashboard = () => {
         <h1>📊 Dashboard</h1>
         <p>Visão geral do sistema</p>
       </div>
+
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
       
       <div className="stats-grid">
         <div className="stat-card">
@@ -70,12 +83,13 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div style={{ marginTop: '30px', padding: '20px', background: '#e7f3ff', borderRadius: '10px' }}>
+      <div className="info-card">
         <h3>💡 Dicas Rápidas</h3>
-        <ul style={{ marginTop: '10px', paddingLeft: '20px' }}>
+        <ul>
           <li>Use "Registrar Ponto" para marcar entradas e saídas</li>
           <li>Cadastre funcionários em "Funcionários"</li>
           <li>Gere relatórios em PDF e Excel em "Relatórios"</li>
+          <li>Verifique o console (F12) para debug</li>
         </ul>
       </div>
     </div>

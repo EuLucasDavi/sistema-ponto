@@ -6,6 +6,7 @@ const TimeClock = () => {
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [lastRecord, setLastRecord] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchEmployees();
@@ -13,21 +14,24 @@ const TimeClock = () => {
 
   const fetchEmployees = async () => {
     try {
+      setError('');
       const response = await axios.get('/api/employees');
       setEmployees(response.data);
     } catch (error) {
       console.error('Erro ao buscar funcionários:', error);
-      alert('Erro ao carregar lista de funcionários');
+      setError('Erro ao carregar lista de funcionários');
     }
   };
 
   const registerTime = async (type) => {
     if (!selectedEmployee) {
-      alert('Selecione um funcionário');
+      setError('Selecione um funcionário');
       return;
     }
 
     setLoading(true);
+    setError('');
+
     try {
       await axios.post('/api/time-records', {
         employee_id: selectedEmployee,
@@ -41,10 +45,9 @@ const TimeClock = () => {
         employee: employees.find(emp => emp._id === selectedEmployee)?.name
       });
       
-      alert(`✅ Ponto ${type === 'entry' ? 'de entrada' : 'de saída'} registrado com sucesso!`);
     } catch (error) {
       console.error('Erro ao registrar ponto:', error);
-      alert('❌ Erro ao registrar ponto');
+      setError(error.response?.data?.error || 'Erro ao registrar ponto');
     } finally {
       setLoading(false);
     }
@@ -56,6 +59,12 @@ const TimeClock = () => {
         <h1>⏰ Registro de Ponto</h1>
         <p>Registre entradas e saídas dos funcionários</p>
       </div>
+
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
       
       <div className="time-clock">
         <div className="form-group">
@@ -100,9 +109,9 @@ const TimeClock = () => {
           </div>
         )}
 
-        <div style={{ marginTop: '30px', padding: '15px', background: '#f8f9fa', borderRadius: '8px' }}>
+        <div className="info-card">
           <h4>💡 Instruções:</h4>
-          <ul style={{ marginTop: '10px', paddingLeft: '20px' }}>
+          <ul>
             <li>Selecione o funcionário na lista</li>
             <li>Clique em "Registrar Entrada" ao chegar</li>
             <li>Clique em "Registrar Saída" ao sair</li>

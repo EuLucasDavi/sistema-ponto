@@ -6,6 +6,7 @@ const EmployeeManagement = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -20,17 +21,19 @@ const EmployeeManagement = () => {
 
   const fetchEmployees = async () => {
     try {
+      setError('');
       const response = await axios.get('/api/employees');
       setEmployees(response.data);
     } catch (error) {
       console.error('Erro ao buscar funcionários:', error);
-      alert('Erro ao carregar funcionários');
+      setError('Erro ao carregar funcionários');
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
 
     try {
       if (editingEmployee) {
@@ -40,10 +43,9 @@ const EmployeeManagement = () => {
       }
       await fetchEmployees();
       resetForm();
-      alert(editingEmployee ? 'Funcionário atualizado com sucesso!' : 'Funcionário cadastrado com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar funcionário:', error);
-      alert(error.response?.data?.error || 'Erro ao salvar funcionário');
+      setError(error.response?.data?.error || 'Erro ao salvar funcionário');
     } finally {
       setLoading(false);
     }
@@ -54,10 +56,9 @@ const EmployeeManagement = () => {
       try {
         await axios.delete(`/api/employees/${id}`);
         await fetchEmployees();
-        alert('Funcionário excluído com sucesso!');
       } catch (error) {
         console.error('Erro ao excluir funcionário:', error);
-        alert('Erro ao excluir funcionário');
+        setError('Erro ao excluir funcionário');
       }
     }
   };
@@ -72,6 +73,7 @@ const EmployeeManagement = () => {
       hire_date: employee.hire_date.split('T')[0]
     });
     setShowForm(true);
+    setError('');
   };
 
   const resetForm = () => {
@@ -84,6 +86,7 @@ const EmployeeManagement = () => {
     });
     setEditingEmployee(null);
     setShowForm(false);
+    setError('');
   };
 
   return (
@@ -98,6 +101,12 @@ const EmployeeManagement = () => {
           ➕ Novo Funcionário
         </button>
       </div>
+
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
 
       {showForm && (
         <div className="form-container">
