@@ -21,30 +21,46 @@ const Layout = ({ children }) => {
       <aside className="sidebar">
         <div className="sidebar-header">
           <h1>🏢 Sistema Ponto</h1>
-          <p>Controle de Pontos</p>
+          <p>{user?.role === 'admin' ? 'Painel Admin' : 'Meu Painel'}</p>
         </div>
         <nav>
           <ul>
             <li>
               <Link to="/" className={isActive('/')}>
-                📊 Dashboard
+                📊 {user?.role === 'admin' ? 'Dashboard' : 'Meu Resumo'}
               </Link>
             </li>
-            <li>
-              <Link to="/time-clock" className={isActive('/time-clock')}>
-                ⏰ Registrar Ponto
-              </Link>
-            </li>
-            <li>
-              <Link to="/employees" className={isActive('/employees')}>
-                👥 Funcionários
-              </Link>
-            </li>
-            <li>
-              <Link to="/reports" className={isActive('/reports')}>
-                📈 Relatórios
-              </Link>
-            </li>
+            
+            {user?.role === 'admin' ? (
+              <>
+                <li>
+                  <Link to="/time-clock" className={isActive('/time-clock')}>
+                    ⏰ Registrar Ponto (Admin)
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/employees" className={isActive('/employees')}>
+                    👥 Funcionários
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/users" className={isActive('/users')}>
+                    👤 Usuários
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/reports" className={isActive('/reports')}>
+                    📈 Relatórios
+                  </Link>
+                </li>
+              </>
+            ) : (
+              <li>
+                <Link to="/my-time" className={isActive('/my-time')}>
+                  ⏰ Meu Ponto
+                </Link>
+              </li>
+            )}
           </ul>
         </nav>
       </aside>
@@ -55,7 +71,9 @@ const Layout = ({ children }) => {
           <div className="navbar-user">
             <div className="user-info">
               <div className="user-name">{user?.username}</div>
-              <div className="user-role">{user?.role}</div>
+              <div className="user-role">
+                {user?.role === 'admin' ? 'Administrador' : 'Funcionário'}
+              </div>
             </div>
             <button onClick={handleLogout} className="btn btn-secondary">
               Sair

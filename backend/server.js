@@ -74,6 +74,8 @@ const createDefaultAdmin = async () => {
   }
 };
 
+// ==================== MIDDLEWARES ====================
+
 // Middleware de autenticação
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -91,6 +93,24 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+// Middleware de autorização para admin
+const requireAdmin = (req, res, next) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Acesso restrito a administradores' });
+  }
+  next();
+};
+
+// Middleware de autorização para funcionários
+const requireEmployee = (req, res, next) => {
+  if (req.user.role !== 'employee' && req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Acesso restrito' });
+  }
+  next();
+};
+
+// ==================== ROTAS PÚBLICAS ====================
 
 // Health check melhorado
 app.get('/health', async (req, res) => {
@@ -191,8 +211,89 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// ==================== ROTAS DE FUNCIONÁRIOS ====================
-app.get('/api/employees', authenticateToken, async (req, res) => {
+// ==================== ROTAS DE USUÁRIOS ====================
+
+// Criar novo usuário (apenas admin)
+app.post('/api/register', authenticateToken, requireAdmin, async (req, res) => {
+  const { username, password, employee_id, role } = req.body;
+
+  try {
+    // Verificar se username já existe
+    const existingUser = await db.collection('users').findOne({ username });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Usuário já existe' });
+    }
+
+    // Verificar se employee_id é válido
+    if (employee_id && !ObjectId.isValid(employee_id)) {
+      return res.status(400).json({ error: 'ID do funcionário inválido' });
+    }
+
+    // Verificar se funcionário existe
+    if (employee_id) {
+      const employee = await db.collection('employees').findOne({ 
+        _id: new ObjectId(employee_id) 
+      });
+      if (!employee) {
+        return res.status(400).json({ error: 'Funcionário não encontrado' });
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    const userData = {
+      username,
+      password: hashedPassword,
+      role: role || 'employee',
+      employee_id: employee_id ? new ObjectId(employee_id) : null,
+      created_at: new Date()
+    };
+
+    const result = await db.collection('users').insertOne(userData);
+    const newUser = await db.collection('users').findOne({ _id: result.insertedId });
+
+    // Remover password da resposta
+    delete newUser.password;
+
+    res.status(201).json(newUser);
+  } catch (error) {
+    console.error('Erro ao criar usuário:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Listar usuários (apenas admin)
+app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const users = await db.collection('users')
+      .find({}, { projection: { password: 0 } }) // Excluir password
+      .sort({ username: 1 })
+      .toArray();
+    
+    // Buscar dados dos funcionários vinculados
+    const usersWithEmployees = await Promise.all(
+      users.map(async (user) => {
+        let employee = null;
+        if (user.employee_id) {
+          employee = await db.collection('employees').findOne({ 
+            _id: user.employee_id 
+          });
+        }
+        return {
+          ...user,
+          employee: employee
+        };
+      })
+    );
+
+    res.json(usersWithEmployees);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== ROTAS DE FUNCIONÁRIOS (APENAS ADMIN) ====================
+app.get('/api/employees', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const employees = await db.collection('employees')
       .find()
@@ -204,7 +305,7 @@ app.get('/api/employees', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/employees', authenticateToken, async (req, res) => {
+app.post('/api/employees', authenticateToken, requireAdmin, async (req, res) => {
   const { name, email, department, salary, hire_date } = req.body;
 
   try {
@@ -228,7 +329,7 @@ app.post('/api/employees', authenticateToken, async (req, res) => {
   }
 });
 
-app.put('/api/employees/:id', authenticateToken, async (req, res) => {
+app.put('/api/employees/:id', authenticateToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { name, email, department, salary } = req.body;
 
@@ -261,7 +362,7 @@ app.put('/api/employees/:id', authenticateToken, async (req, res) => {
   }
 });
 
-app.delete('/api/employees/:id', authenticateToken, async (req, res) => {
+app.delete('/api/employees/:id', authenticateToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -279,8 +380,8 @@ app.delete('/api/employees/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// ==================== ROTAS DE REGISTRO DE PONTO ====================
-app.post('/api/time-records', authenticateToken, async (req, res) => {
+// ==================== ROTAS DE REGISTRO DE PONTO (ADMIN) ====================
+app.post('/api/time-records', authenticateToken, requireAdmin, async (req, res) => {
   const { employee_id, type } = req.body;
   const timestamp = new Date();
 
@@ -299,7 +400,7 @@ app.post('/api/time-records', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/api/time-records/:employee_id', authenticateToken, async (req, res) => {
+app.get('/api/time-records/:employee_id', authenticateToken, requireAdmin, async (req, res) => {
   const { employee_id } = req.params;
   const { start_date, end_date } = req.query;
 
@@ -321,12 +422,199 @@ app.get('/api/time-records/:employee_id', authenticateToken, async (req, res) =>
   }
 });
 
-// ==================== RELATÓRIOS PDF ====================
-app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, async (req, res) => {
+// ==================== ROTAS PESSOAIS DO FUNCIONÁRIO ====================
+
+// Funcionário ver seus próprios dados
+app.get('/api/me/employee', authenticateToken, requireEmployee, async (req, res) => {
+  try {
+    const user = await db.collection('users').findOne({ 
+      _id: new ObjectId(req.user.id) 
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    let employee = null;
+    if (user.employee_id) {
+      employee = await db.collection('employees').findOne({ 
+        _id: user.employee_id 
+      });
+    }
+
+    res.json({
+      user: {
+        id: user._id,
+        username: user.username,
+        role: user.role
+      },
+      employee: employee
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Funcionário ver seus próprios registros de ponto
+app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
+  try {
+    const user = await db.collection('users').findOne({ 
+      _id: new ObjectId(req.user.id) 
+    });
+
+    if (!user || !user.employee_id) {
+      return res.status(404).json({ error: 'Funcionário não vinculado' });
+    }
+
+    const { start_date, end_date } = req.query;
+    
+    let query = { employee_id: user.employee_id };
+    
+    if (start_date && end_date) {
+      query.timestamp = {
+        $gte: new Date(start_date),
+        $lte: new Date(end_date + 'T23:59:59.999Z')
+      };
+    }
+
+    const records = await db.collection('time_records')
+      .find(query)
+      .sort({ timestamp: -1 })
+      .limit(100) // Limitar para não sobrecarregar
+      .toArray();
+
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Funcionário registrar seu próprio ponto
+app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
+  const { type } = req.body;
+  const timestamp = new Date();
+
+  try {
+    const user = await db.collection('users').findOne({ 
+      _id: new ObjectId(req.user.id) 
+    });
+
+    if (!user || !user.employee_id) {
+      return res.status(400).json({ error: 'Funcionário não vinculado' });
+    }
+
+    const result = await db.collection('time_records').insertOne({
+      employee_id: user.employee_id,
+      type,
+      timestamp,
+      created_at: new Date()
+    });
+
+    const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
+    
+    // Buscar dados do funcionário para a resposta
+    const employee = await db.collection('employees').findOne({ 
+      _id: user.employee_id 
+    });
+
+    res.status(201).json({
+      ...newRecord,
+      employee_name: employee?.name
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== DASHBOARD (ADAPTADO POR ROLE) ====================
+app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role === 'admin') {
+      // Stats para admin
+      const totalEmployees = await db.collection('employees').countDocuments();
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const todayRecords = await db.collection('time_records')
+        .countDocuments({
+          timestamp: { $gte: today }
+        });
+
+      const recentEmployees = await db.collection('employees')
+        .find()
+        .sort({ created_at: -1 })
+        .limit(5)
+        .toArray();
+
+      res.json({
+        role: 'admin',
+        totalEmployees,
+        todayRecords,
+        recentEmployees
+      });
+    } else {
+      // Stats para funcionário
+      const user = await db.collection('users').findOne({ 
+        _id: new ObjectId(req.user.id) 
+      });
+
+      if (!user || !user.employee_id) {
+        return res.json({
+          role: 'employee',
+          employee: null,
+          todayRecords: 0,
+          recentRecords: []
+        });
+      }
+
+      const employee = await db.collection('employees').findOne({ 
+        _id: user.employee_id 
+      });
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const todayRecords = await db.collection('time_records')
+        .countDocuments({
+          employee_id: user.employee_id,
+          timestamp: { $gte: today }
+        });
+
+      const recentRecords = await db.collection('time_records')
+        .find({
+          employee_id: user.employee_id
+        })
+        .sort({ timestamp: -1 })
+        .limit(5)
+        .toArray();
+
+      res.json({
+        role: 'employee',
+        employee,
+        todayRecords,
+        recentRecords
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== RELATÓRIOS PDF (APENAS ADMIN) ====================
+app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, requireAdmin, async (req, res) => {
   const { employee_id } = req.params;
   const { start_date, end_date } = req.query;
 
+  console.log('📊 Gerando PDF para funcionário:', employee_id);
+  console.log('📅 Período:', start_date, 'até', end_date);
+
   try {
+    // Verificar se o employee_id é válido
+    if (!ObjectId.isValid(employee_id)) {
+      return res.status(400).json({ error: 'ID do funcionário inválido' });
+    }
+
     const employee = await db.collection('employees').findOne({ 
       _id: new ObjectId(employee_id) 
     });
@@ -346,41 +634,59 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, async (req
       .sort({ timestamp: 1 })
       .toArray();
 
+    console.log(`📈 Encontrados ${records.length} registros`);
+
     // Criar PDF
     const doc = new PDFDocument();
+    
+    // Configurar headers ANTES de escrever no PDF
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=espelho-ponto-${employee.name}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=espelho-ponto-${employee.name.replace(/\s+/g, '_')}.pdf`);
 
     doc.pipe(res);
 
     // Cabeçalho
     doc.fontSize(20).text('ESPELHO DE PONTO', { align: 'center' });
     doc.moveDown();
-    doc.fontSize(12).text(`Funcionário: ${employee.name}`);
-    doc.text(`Departamento: ${employee.department}`);
-    doc.text(`Período: ${new Date(start_date).toLocaleDateString('pt-BR')} à ${new Date(end_date).toLocaleDateString('pt-BR')}`);
-    doc.text(`Data de emissão: ${new Date().toLocaleDateString('pt-BR')}`);
+    doc.fontSize(12)
+       .text(`Funcionário: ${employee.name}`)
+       .text(`Departamento: ${employee.department}`)
+       .text(`Período: ${new Date(start_date).toLocaleDateString('pt-BR')} à ${new Date(end_date).toLocaleDateString('pt-BR')}`)
+       .text(`Data de emissão: ${new Date().toLocaleDateString('pt-BR')}`);
     doc.moveDown();
 
-    let yPosition = 200;
+    let yPosition = 150;
     
     // Cabeçalho da tabela
     doc.fontSize(10).font('Helvetica-Bold');
     doc.text('Data', 50, yPosition);
     doc.text('Hora', 150, yPosition);
     doc.text('Tipo', 250, yPosition);
-    doc.text('Dia da Semana', 320, yPosition);
+    doc.text('Dia da Semana', 350, yPosition);
     
     yPosition += 20;
-    doc.moveTo(50, yPosition).lineTo(450, yPosition).stroke();
+    doc.moveTo(50, yPosition).lineTo(500, yPosition).stroke();
     doc.font('Helvetica');
 
     // Registros
-    records.forEach(record => {
+    records.forEach((record, index) => {
       yPosition += 20;
+      
+      // Quebra de página se necessário
       if (yPosition > 700) {
         doc.addPage();
         yPosition = 100;
+        
+        // Cabeçalho da tabela na nova página
+        doc.fontSize(10).font('Helvetica-Bold');
+        doc.text('Data', 50, yPosition);
+        doc.text('Hora', 150, yPosition);
+        doc.text('Tipo', 250, yPosition);
+        doc.text('Dia da Semana', 350, yPosition);
+        yPosition += 20;
+        doc.moveTo(50, yPosition).lineTo(500, yPosition).stroke();
+        doc.font('Helvetica');
+        yPosition += 20;
       }
 
       const date = new Date(record.timestamp);
@@ -390,28 +696,37 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, async (req
       
       doc.text(dateStr, 50, yPosition);
       doc.text(timeStr, 150, yPosition);
-      doc.text(record.type === 'entry' ? 'Entrada' : 'Saída', 250, yPosition);
-      doc.text(dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1), 320, yPosition);
+      doc.text(record.type === 'entry' ? 'ENTRADA' : 'SAÍDA', 250, yPosition);
+      doc.text(dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1), 350, yPosition);
     });
 
     // Resumo
-    yPosition += 40;
-    doc.font('Helvetica-Bold').text('RESUMO:', 50, yPosition);
-    doc.font('Helvetica');
-    yPosition += 20;
-    doc.text(`Total de registros: ${records.length}`, 50, yPosition);
-    doc.text(`Entradas: ${records.filter(r => r.type === 'entry').length}`, 50, yPosition + 15);
-    doc.text(`Saídas: ${records.filter(r => r.type === 'exit').length}`, 50, yPosition + 30);
+    if (records.length > 0) {
+      yPosition += 40;
+      doc.font('Helvetica-Bold').text('RESUMO:', 50, yPosition);
+      doc.font('Helvetica');
+      yPosition += 20;
+      doc.text(`Total de registros: ${records.length}`, 50, yPosition);
+      doc.text(`Entradas: ${records.filter(r => r.type === 'entry').length}`, 50, yPosition + 15);
+      doc.text(`Saídas: ${records.filter(r => r.type === 'exit').length}`, 50, yPosition + 30);
+    } else {
+      yPosition += 40;
+      doc.font('Helvetica-Bold').text('NENHUM REGISTRO ENCONTRADO PARA O PERÍODO', 50, yPosition);
+    }
 
     doc.end();
+    
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('❌ Erro ao gerar PDF:', error);
+    res.status(500).json({ error: 'Erro ao gerar PDF: ' + error.message });
   }
 });
 
-// ==================== RELATÓRIOS EXCEL ====================
-app.get('/api/reports/payroll/excel', authenticateToken, async (req, res) => {
+// ==================== RELATÓRIOS EXCEL (APENAS ADMIN) ====================
+app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (req, res) => {
   const { month, year } = req.query;
+
+  console.log('💰 Gerando Excel - Mês:', month, 'Ano:', year);
 
   try {
     const startDate = new Date(year, month - 1, 1);
@@ -419,6 +734,7 @@ app.get('/api/reports/payroll/excel', authenticateToken, async (req, res) => {
 
     // Buscar todos os funcionários
     const employees = await db.collection('employees').find().toArray();
+    console.log(`👥 ${employees.length} funcionários encontrados`);
 
     // Para cada funcionário, calcular dias trabalhados
     const payrollData = await Promise.all(
@@ -432,10 +748,10 @@ app.get('/api/reports/payroll/excel', authenticateToken, async (req, res) => {
           .toArray();
 
         const diasTrabalhados = records.length;
-        const salarioProporcional = (employee.salary / 30) * diasTrabalhados;
+        const salarioProporcional = diasTrabalhados > 0 ? (employee.salary / 30) * diasTrabalhados : 0;
 
         return {
-          id: employee._id.toString(),
+          id: employee._id.toString().substring(18, 24), // ID curto
           name: employee.name,
           department: employee.department,
           salary: employee.salary,
@@ -449,7 +765,7 @@ app.get('/api/reports/payroll/excel', authenticateToken, async (req, res) => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Folha de Pagamento');
 
-    // Cabeçalhos
+    // Configurar cabeçalhos
     worksheet.columns = [
       { header: 'ID', key: 'id', width: 10 },
       { header: 'Nome', key: 'name', width: 30 },
@@ -459,7 +775,7 @@ app.get('/api/reports/payroll/excel', authenticateToken, async (req, res) => {
       { header: 'Salário Proporcional (R$)', key: 'salario_proporcional', width: 20 }
     ];
 
-    // Dados
+    // Adicionar dados
     payrollData.forEach(employee => {
       worksheet.addRow(employee);
     });
@@ -469,59 +785,46 @@ app.get('/api/reports/payroll/excel', authenticateToken, async (req, res) => {
     worksheet.getColumn('salario_proporcional').numFmt = '"R$"#,##0.00';
 
     // Formatar cabeçalhos
-    worksheet.getRow(1).font = { bold: true };
-    worksheet.getRow(1).fill = {
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FFE6E6FA' }
+      fgColor: { argb: 'FF2E86AB' }
     };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
 
     // Adicionar totais
-    const totalRow = payrollData.length + 3;
-    worksheet.getCell(`E${totalRow}`).value = 'TOTAL:';
-    worksheet.getCell(`E${totalRow}`).font = { bold: true };
-    
-    const totalSalario = payrollData.reduce((sum, emp) => sum + emp.salario_proporcional, 0);
-    worksheet.getCell(`F${totalRow}`).value = totalSalario;
-    worksheet.getCell(`F${totalRow}`).numFmt = '"R$"#,##0.00';
-    worksheet.getCell(`F${totalRow}`).font = { bold: true };
+    if (payrollData.length > 0) {
+      const totalRow = payrollData.length + 3;
+      worksheet.mergeCells(`A${totalRow}:D${totalRow}`);
+      worksheet.getCell(`A${totalRow}`).value = 'TOTAL GERAL:';
+      worksheet.getCell(`A${totalRow}`).font = { bold: true };
+      worksheet.getCell(`A${totalRow}`).alignment = { horizontal: 'right' };
+      
+      const totalSalario = payrollData.reduce((sum, emp) => sum + emp.salario_proporcional, 0);
+      worksheet.getCell(`F${totalRow}`).value = totalSalario;
+      worksheet.getCell(`F${totalRow}`).numFmt = '"R$"#,##0.00';
+      worksheet.getCell(`F${totalRow}`).font = { bold: true };
+      worksheet.getCell(`F${totalRow}`).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF2F2F2' }
+      };
+    }
 
+    // Configurar headers ANTES de escrever o Excel
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=folha-pagamento-${month}-${year}.xlsx`);
 
     await workbook.xlsx.write(res);
     res.end();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ==================== DASHBOARD ====================
-app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
-  try {
-    const totalEmployees = await db.collection('employees').countDocuments();
     
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    console.log('✅ Excel gerado com sucesso');
     
-    const todayRecords = await db.collection('time_records')
-      .countDocuments({
-        timestamp: { $gte: today }
-      });
-
-    const recentEmployees = await db.collection('employees')
-      .find()
-      .sort({ created_at: -1 })
-      .limit(5)
-      .toArray();
-
-    res.json({
-      totalEmployees,
-      todayRecords,
-      recentEmployees
-    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('❌ Erro ao gerar Excel:', error);
+    res.status(500).json({ error: 'Erro ao gerar Excel: ' + error.message });
   }
 });
 

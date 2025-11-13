@@ -3,13 +3,15 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import EmployeeDashboard from './components/EmployeeDashboard';
 import EmployeeManagement from './components/EmployeeManagement';
+import UserManagement from './components/UserManagement';
 import Reports from './components/Reports';
 import TimeClock from './components/TimeClock';
 import Layout from './components/Layout';
 import './App.css';
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, requireAdmin = false }) {
   const { user, loading } = useAuth();
   
   if (loading) {
@@ -20,7 +22,21 @@ function ProtectedRoute({ children }) {
     );
   }
   
-  return user ? children : <Navigate to="/login" />;
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+  
+  if (requireAdmin && user.role !== 'admin') {
+    return (
+      <div className="container">
+        <div className="error-message">
+          ❌ Acesso restrito a administradores
+        </div>
+      </div>
+    );
+  }
+  
+  return children;
 }
 
 function App() {
@@ -30,6 +46,8 @@ function App() {
         <div className="app">
           <Routes>
             <Route path="/login" element={<Login />} />
+            
+            {/* Rotas para todos os usuários autenticados */}
             <Route path="/" element={
               <ProtectedRoute>
                 <Layout>
@@ -37,27 +55,48 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             } />
-            <Route path="/employees" element={
+            
+            <Route path="/my-time" element={
               <ProtectedRoute>
+                <Layout>
+                  <EmployeeDashboard />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            {/* Rotas apenas para administradores */}
+            <Route path="/employees" element={
+              <ProtectedRoute requireAdmin={true}>
                 <Layout>
                   <EmployeeManagement />
                 </Layout>
               </ProtectedRoute>
             } />
-            <Route path="/time-clock" element={
-              <ProtectedRoute>
+            
+            <Route path="/users" element={
+              <ProtectedRoute requireAdmin={true}>
                 <Layout>
-                  <TimeClock />
+                  <UserManagement />
                 </Layout>
               </ProtectedRoute>
             } />
+            
             <Route path="/reports" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin={true}>
                 <Layout>
                   <Reports />
                 </Layout>
               </ProtectedRoute>
             } />
+            
+            <Route path="/time-clock" element={
+              <ProtectedRoute requireAdmin={true}>
+                <Layout>
+                  <TimeClock />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>
