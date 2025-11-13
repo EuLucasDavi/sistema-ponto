@@ -553,7 +553,7 @@ body {
   border-radius: 10px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   margin-bottom: 25px;
-  margin-top: 25px;
+  padding-top: 60px;
   border-left: 4px solid #007bff;
 }
 
@@ -715,4 +715,114 @@ body {
 
 .data-table .btn {
   margin: 2px;
+}
+
+/* Estilos para o componente Reports */
+.report-features {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+}
+
+.report-features h4 {
+  margin-bottom: 10px;
+  color: #495057;
+  font-size: 14px;
+}
+
+.report-features ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 12px;
+}
+
+.report-features li {
+  margin-bottom: 5px;
+  color: #6c757d;
+}
+
+.calculation-info {
+  margin-bottom: 25px;
+}
+
+.formula-group {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #28a745;
+}
+
+.formula-group h5 {
+  margin-bottom: 10px;
+  color: #495057;
+  font-size: 14px;
+}
+
+.formula {
+  background: #e9ecef;
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.formula code {
+  background: none;
+  padding: 0;
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.troubleshooting,
+.best-practices {
+  margin-top: 25px;
+  padding: 20px;
+  background: #fff3cd;
+  border-radius: 8px;
+  border: 1px solid #ffeaa7;
+}
+
+.troubleshooting h4,
+.best-practices h4 {
+  color: #856404;
+  margin-bottom: 15px;
+}
+
+.troubleshooting ul,
+.best-practices ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.troubleshooting li,
+.best-practices li {
+  margin-bottom: 8px;
+  color: #856404;
+}
+
+.info-content h4 {
+  color: #495057;
+  margin-top: 20px;
+  margin-bottom: 15px;
+  font-size: 16px;
+}
+
+/* Melhorias responsivas */
+@media (max-width: 768px) {
+  .report-features {
+    padding: 10px;
+  }
+  
+  .formula-group {
+    padding: 10px;
+  }
+  
+  .formula {
+    font-size: 11px;
+    padding: 8px;
+  }
 }

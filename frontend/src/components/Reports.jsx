@@ -55,7 +55,7 @@ const Reports = () => {
       const link = document.createElement('a');
       link.href = url;
       link.target = '_blank';
-      link.download = `espelho-ponto-${employee.name}.pdf`;
+      link.download = `espelho-ponto-${employee.name.replace(/\s+/g, '_')}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -108,7 +108,7 @@ const Reports = () => {
     <div className="container">
       <div className="header">
         <h1>📈 Relatórios</h1>
-        <p>Gere relatórios em PDF e Excel</p>
+        <p>Gere relatórios profissionais em PDF e Excel</p>
       </div>
 
       {error && (
@@ -127,7 +127,7 @@ const Reports = () => {
         {/* Espelho de Ponto */}
         <div className="report-card">
           <h2>📄 Espelho de Ponto (PDF)</h2>
-          <p>Gere o espelho de ponto individual em PDF</p>
+          <p>Gere o espelho de ponto individual em formato profissional</p>
           
           <div className="form-group">
             <label>Funcionário:</label>
@@ -172,12 +172,24 @@ const Reports = () => {
           >
             {loading.pdf ? '⏳ Gerando PDF...' : '📥 Baixar PDF'}
           </button>
+
+          <div className="report-features">
+            <h4>📋 Características do PDF:</h4>
+            <ul>
+              <li>✅ Formato profissional de espelho de ponto</li>
+              <li>✅ Cálculo automático de horas trabalhadas</li>
+              <li>✅ Controle de horas extras</li>
+              <li>✅ Totais consolidados do período</li>
+              <li>✅ Espaço para assinaturas</li>
+              <li>✅ Layout otimizado para impressão</li>
+            </ul>
+          </div>
         </div>
 
         {/* Folha de Pagamento */}
         <div className="report-card">
           <h2>💰 Folha de Pagamento (Excel)</h2>
-          <p>Gere a folha de pagamento completa em Excel</p>
+          <p>Gere a folha de pagamento completa com cálculos automáticos</p>
           
           <div className="form-group">
             <label>Mês:</label>
@@ -213,19 +225,80 @@ const Reports = () => {
           >
             {loading.excel ? '⏳ Gerando Excel...' : '📊 Baixar Excel'}
           </button>
+
+          <div className="report-features">
+            <h4>📊 Características do Excel:</h4>
+            <ul>
+              <li>✅ <strong>2 Planilhas:</strong> Resumo + Detalhes</li>
+              <li>✅ Cálculo automático de horas extras (50%)</li>
+              <li>✅ Salário proporcional às horas trabalhadas</li>
+              <li>✅ Base de 8 horas diárias</li>
+              <li>✅ Totais consolidados automáticos</li>
+              <li>✅ Formatação profissional</li>
+            </ul>
+          </div>
         </div>
       </div>
 
       <div className="info-card">
-        <h3>💡 Dicas para os Relatórios</h3>
+        <h3>ℹ️ Informações sobre os Relatórios</h3>
         <div className="info-content">
-          <p><strong>Problemas comuns:</strong></p>
-          <ul>
-            <li>Se o download não iniciar, verifique o bloqueador de popups</li>
-            <li>Certifique-se de ter registros de ponto no período selecionado</li>
-            <li>Verifique o console (F12) para mensagens de erro detalhadas</li>
-            <li>Funcionários sem registros não aparecerão no Excel</li>
-          </ul>
+          <div className="calculation-info">
+            <h4>🧮 Fórmulas de Cálculo Utilizadas:</h4>
+            
+            <div className="formula-group">
+              <h5>Valor Hora Normal:</h5>
+              <div className="formula">
+                <code>Salário Base ÷ 30 dias ÷ 8 horas</code>
+              </div>
+              <p>Exemplo: R$ 3.000,00 ÷ 30 ÷ 8 = <strong>R$ 12,50/hora</strong></p>
+            </div>
+
+            <div className="formula-group">
+              <h5>Valor Hora Extra:</h5>
+              <div className="formula">
+                <code>Hora Normal × 1.5 (50% de acréscimo)</code>
+              </div>
+              <p>Exemplo: R$ 12,50 × 1.5 = <strong>R$ 18,75/hora extra</strong></p>
+            </div>
+
+            <div className="formula-group">
+              <h5>Jornada de Trabalho:</h5>
+              <div className="formula">
+                <code>8 horas diárias padrão</code>
+              </div>
+              <p>Horas acima de 8h/dia são consideradas extras</p>
+            </div>
+
+            <div className="formula-group">
+              <h5>Salário Proporcional:</h5>
+              <div className="formula">
+                <code>(Horas Normais × Valor Hora) + (Horas Extras × Valor Hora Extra)</code>
+              </div>
+            </div>
+          </div>
+
+          <div className="troubleshooting">
+            <h4>🔧 Solução de Problemas:</h4>
+            <ul>
+              <li><strong>Download não inicia:</strong> Verifique o bloqueador de popups do navegador</li>
+              <li><strong>Relatório vazio:</strong> Certifique-se de existirem registros no período</li>
+              <li><strong>Erro no cálculo:</strong> Verifique se todos os dias têm entrada e saída registradas</li>
+              <li><strong>Funcionário não aparece:</strong> Confirme se há registros de ponto no mês</li>
+              <li><strong>Problemas técnicos:</strong> Verifique o console (F12) para detalhes</li>
+            </ul>
+          </div>
+
+          <div className="best-practices">
+            <h4>💡 Melhores Práticas:</h4>
+            <ul>
+              <li>Gere o espelho de ponto ao final de cada período de pagamento</li>
+              <li>Verifique os cálculos manualmente para validação</li>
+              <li>Mantenha os registros de ponto atualizados diariamente</li>
+              <li>Revise as horas extras antes do processamento</li>
+              <li>Arquive os relatórios gerados para auditoria</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>

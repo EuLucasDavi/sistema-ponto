@@ -782,7 +782,7 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
   }
 });
 
-// ==================== RELATÓRIOS PDF (APENAS ADMIN) ====================
+// ==================== RELATÓRIOS PDF - ESPELHO DE PONTO FORMATADO ====================
 app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, requireAdmin, async (req, res) => {
   const { employee_id } = req.params;
   const { start_date, end_date } = req.query;
@@ -791,7 +791,6 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, requireAdm
   console.log('📅 Período:', start_date, 'até', end_date);
 
   try {
-    // Verificar se o employee_id é válido
     if (!ObjectId.isValid(employee_id)) {
       return res.status(400).json({ error: 'ID do funcionário inválido' });
     }
@@ -804,6 +803,7 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, requireAdm
       return res.status(404).json({ error: 'Funcionário não encontrado' });
     }
 
+    // Buscar registros ordenados por data
     const records = await db.collection('time_records')
       .find({
         employee_id: new ObjectId(employee_id),
@@ -817,83 +817,162 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, requireAdm
 
     console.log(`📈 Encontrados ${records.length} registros`);
 
+    // Agrupar registros por dia
+    const recordsByDay = {};
+    records.forEach(record => {
+      const dateKey = new Date(record.timestamp).toISOString().split('T')[0];
+      if (!recordsByDay[dateKey]) {
+        recordsByDay[dateKey] = [];
+      }
+      recordsByDay[dateKey].push(record);
+    });
+
     // Criar PDF
-    const doc = new PDFDocument();
+    const doc = new PDFDocument({ margin: 50 });
     
-    // Configurar headers ANTES de escrever no PDF
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=espelho-ponto-${employee.name.replace(/\s+/g, '_')}.pdf`);
 
     doc.pipe(res);
 
     // Cabeçalho
-    doc.fontSize(20).text('ESPELHO DE PONTO', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(12)
-       .text(`Funcionário: ${employee.name}`)
-       .text(`Departamento: ${employee.department}`)
-       .text(`Período: ${new Date(start_date).toLocaleDateString('pt-BR')} à ${new Date(end_date).toLocaleDateString('pt-BR')}`)
-       .text(`Data de emissão: ${new Date().toLocaleDateString('pt-BR')}`);
-    doc.moveDown();
-
-    let yPosition = 150;
+    doc.fontSize(16).font('Helvetica-Bold')
+       .text('ESPELHO DE PONTO', { align: 'center' });
     
+    doc.moveDown(0.5);
+    doc.fontSize(10).font('Helvetica')
+       .text(`Funcionário: ${employee.name}`, { align: 'left' })
+       .text(`Matrícula: ${employee._id.toString().substring(18, 24)}`, { align: 'left' })
+       .text(`Departamento: ${employee.department}`, { align: 'left' })
+       .text(`Período: ${new Date(start_date).toLocaleDateString('pt-BR')} à ${new Date(end_date).toLocaleDateString('pt-BR')}`, { align: 'left' })
+       .text(`Data de emissão: ${new Date().toLocaleDateString('pt-BR')}`, { align: 'left' });
+
+    doc.moveDown(1);
+
+    // Tabela de registros
+    let yPosition = doc.y;
+    const pageWidth = doc.page.width - 100;
+    const colWidth = pageWidth / 6;
+
     // Cabeçalho da tabela
-    doc.fontSize(10).font('Helvetica-Bold');
-    doc.text('Data', 50, yPosition);
-    doc.text('Hora', 150, yPosition);
-    doc.text('Tipo', 250, yPosition);
-    doc.text('Dia da Semana', 350, yPosition);
+    doc.fontSize(9).font('Helvetica-Bold');
+    doc.text('DATA', 50, yPosition);
+    doc.text('DIA', 50 + colWidth, yPosition);
+    doc.text('ENTRADA', 50 + colWidth * 2, yPosition);
+    doc.text('SAÍDA', 50 + colWidth * 3, yPosition);
+    doc.text('TOTAL', 50 + colWidth * 4, yPosition);
+    doc.text('H. EXTRA', 50 + colWidth * 5, yPosition);
     
-    yPosition += 20;
-    doc.moveTo(50, yPosition).lineTo(500, yPosition).stroke();
-    doc.font('Helvetica');
+    yPosition += 15;
+    doc.moveTo(50, yPosition).lineTo(50 + pageWidth, yPosition).stroke();
+    yPosition += 10;
 
-    // Registros
-    records.forEach((record, index) => {
-      yPosition += 20;
+    // Linhas da tabela
+    doc.fontSize(8).font('Helvetica');
+    
+    let totalHorasNormais = 0;
+    let totalHorasExtras = 0;
+    const diasUteis = Object.keys(recordsByDay).length;
+
+    Object.keys(recordsByDay).sort().forEach(dateKey => {
+      const dayRecords = recordsByDay[dateKey];
+      const date = new Date(dateKey);
+      const dayName = date.toLocaleDateString('pt-BR', { weekday: 'long' });
       
-      // Quebra de página se necessário
-      if (yPosition > 700) {
+      // Encontrar entrada e saída do dia
+      const entrada = dayRecords.find(r => r.type === 'entry');
+      const saida = dayRecords.find(r => r.type === 'exit');
+
+      if (yPosition > 650) {
         doc.addPage();
-        yPosition = 100;
+        yPosition = 50;
         
-        // Cabeçalho da tabela na nova página
-        doc.fontSize(10).font('Helvetica-Bold');
-        doc.text('Data', 50, yPosition);
-        doc.text('Hora', 150, yPosition);
-        doc.text('Tipo', 250, yPosition);
-        doc.text('Dia da Semana', 350, yPosition);
-        yPosition += 20;
-        doc.moveTo(50, yPosition).lineTo(500, yPosition).stroke();
-        doc.font('Helvetica');
-        yPosition += 20;
+        // Cabeçalho na nova página
+        doc.fontSize(9).font('Helvetica-Bold');
+        doc.text('DATA', 50, yPosition);
+        doc.text('DIA', 50 + colWidth, yPosition);
+        doc.text('ENTRADA', 50 + colWidth * 2, yPosition);
+        doc.text('SAÍDA', 50 + colWidth * 3, yPosition);
+        doc.text('TOTAL', 50 + colWidth * 4, yPosition);
+        doc.text('H. EXTRA', 50 + colWidth * 5, yPosition);
+        
+        yPosition += 15;
+        doc.moveTo(50, yPosition).lineTo(50 + pageWidth, yPosition).stroke();
+        yPosition += 10;
+        doc.fontSize(8).font('Helvetica');
       }
 
-      const date = new Date(record.timestamp);
-      const dateStr = date.toLocaleDateString('pt-BR');
-      const timeStr = date.toLocaleTimeString('pt-BR');
-      const dayOfWeek = date.toLocaleDateString('pt-BR', { weekday: 'long' });
+      // Data
+      doc.text(date.toLocaleDateString('pt-BR'), 50, yPosition);
       
-      doc.text(dateStr, 50, yPosition);
-      doc.text(timeStr, 150, yPosition);
-      doc.text(record.type === 'entry' ? 'ENTRADA' : 'SAÍDA', 250, yPosition);
-      doc.text(dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1), 350, yPosition);
+      // Dia da semana
+      doc.text(dayName.charAt(0).toUpperCase() + dayName.slice(1), 50 + colWidth, yPosition);
+      
+      // Entrada
+      if (entrada) {
+        doc.text(new Date(entrada.timestamp).toLocaleTimeString('pt-BR'), 50 + colWidth * 2, yPosition);
+      } else {
+        doc.text('--:--', 50 + colWidth * 2, yPosition);
+      }
+      
+      // Saída
+      if (saida) {
+        doc.text(new Date(saida.timestamp).toLocaleTimeString('pt-BR'), 50 + colWidth * 3, yPosition);
+      } else {
+        doc.text('--:--', 50 + colWidth * 3, yPosition);
+      }
+      
+      // Cálculo de horas
+      let horasTrabalhadas = '--:--';
+      let horasExtras = '--:--';
+      
+      if (entrada && saida) {
+        const diffMs = new Date(saida.timestamp) - new Date(entrada.timestamp);
+        const diffHours = diffMs / (1000 * 60 * 60);
+        
+        const horas = Math.floor(diffHours);
+        const minutos = Math.floor((diffHours - horas) * 60);
+        horasTrabalhadas = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+        
+        // Calcular horas extras (acima de 8 horas)
+        if (diffHours > 8) {
+          const extraHours = diffHours - 8;
+          const extraHoras = Math.floor(extraHours);
+          const extraMinutos = Math.floor((extraHours - extraHoras) * 60);
+          horasExtras = `${extraHoras.toString().padStart(2, '0')}:${extraMinutos.toString().padStart(2, '0')}`;
+          totalHorasExtras += extraHours;
+        } else {
+          horasExtras = '00:00';
+        }
+        
+        totalHorasNormais += Math.min(diffHours, 8);
+      }
+      
+      doc.text(horasTrabalhadas, 50 + colWidth * 4, yPosition);
+      doc.text(horasExtras, 50 + colWidth * 5, yPosition);
+      
+      yPosition += 12;
     });
 
     // Resumo
-    if (records.length > 0) {
-      yPosition += 40;
-      doc.font('Helvetica-Bold').text('RESUMO:', 50, yPosition);
-      doc.font('Helvetica');
-      yPosition += 20;
-      doc.text(`Total de registros: ${records.length}`, 50, yPosition);
-      doc.text(`Entradas: ${records.filter(r => r.type === 'entry').length}`, 50, yPosition + 15);
-      doc.text(`Saídas: ${records.filter(r => r.type === 'exit').length}`, 50, yPosition + 30);
-    } else {
-      yPosition += 40;
-      doc.font('Helvetica-Bold').text('NENHUM REGISTRO ENCONTRADO PARA O PERÍODO', 50, yPosition);
-    }
+    yPosition += 20;
+    doc.fontSize(9).font('Helvetica-Bold')
+       .text('RESUMO DO PERÍODO', 50, yPosition);
+    
+    yPosition += 15;
+    doc.fontSize(8).font('Helvetica')
+       .text(`Total de dias úteis: ${diasUteis}`, 50, yPosition)
+       .text(`Horas normais: ${Math.floor(totalHorasNormais)}h ${Math.floor((totalHorasNormais - Math.floor(totalHorasNormais)) * 60)}min`, 50, yPosition + 12)
+       .text(`Horas extras: ${Math.floor(totalHorasExtras)}h ${Math.floor((totalHorasExtras - Math.floor(totalHorasExtras)) * 60)}min`, 50, yPosition + 24)
+       .text(`Salário base: R$ ${employee.salary.toFixed(2)}`, 50, yPosition + 36);
+
+    // Assinaturas
+    const assinaturaY = doc.page.height - 100;
+    doc.moveTo(50, assinaturaY).lineTo(250, assinaturaY).stroke();
+    doc.moveTo(300, assinaturaY).lineTo(500, assinaturaY).stroke();
+    
+    doc.text('Assinatura do Funcionário', 100, assinaturaY + 10);
+    doc.text('Assinatura do Responsável', 350, assinaturaY + 10);
 
     doc.end();
     
@@ -903,7 +982,7 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, requireAdm
   }
 });
 
-// ==================== RELATÓRIOS EXCEL (APENAS ADMIN) ====================
+// ==================== RELATÓRIOS EXCEL - FOLHA DE PAGAMENTO COMPLETA ====================
 app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (req, res) => {
   const { month, year } = req.query;
 
@@ -917,53 +996,118 @@ app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (re
     const employees = await db.collection('employees').find().toArray();
     console.log(`👥 ${employees.length} funcionários encontrados`);
 
-    // Para cada funcionário, calcular dias trabalhados
+    // Para cada funcionário, calcular dados de ponto
     const payrollData = await Promise.all(
       employees.map(async (employee) => {
+        // Buscar todos os registros do mês
         const records = await db.collection('time_records')
           .find({
             employee_id: employee._id,
-            timestamp: { $gte: startDate, $lte: endDate },
-            type: 'entry'
+            timestamp: { $gte: startDate, $lte: endDate }
           })
+          .sort({ timestamp: 1 })
           .toArray();
 
-        const diasTrabalhados = records.length;
-        const salarioProporcional = diasTrabalhados > 0 ? (employee.salary / 30) * diasTrabalhados : 0;
+        // Agrupar registros por dia
+        const recordsByDay = {};
+        records.forEach(record => {
+          const dateKey = new Date(record.timestamp).toISOString().split('T')[0];
+          if (!recordsByDay[dateKey]) {
+            recordsByDay[dateKey] = [];
+          }
+          recordsByDay[dateKey].push(record);
+        });
+
+        // Calcular totais
+        let totalHorasNormais = 0;
+        let totalHorasExtras = 0;
+        let diasTrabalhados = 0;
+
+        Object.keys(recordsByDay).forEach(dateKey => {
+          const dayRecords = recordsByDay[dateKey];
+          const entrada = dayRecords.find(r => r.type === 'entry');
+          const saida = dayRecords.find(r => r.type === 'exit');
+
+          if (entrada && saida) {
+            const diffMs = new Date(saida.timestamp) - new Date(entrada.timestamp);
+            const diffHours = diffMs / (1000 * 60 * 60);
+            
+            totalHorasNormais += Math.min(diffHours, 8);
+            if (diffHours > 8) {
+              totalHorasExtras += diffHours - 8;
+            }
+            diasTrabalhados++;
+          }
+        });
+
+        // Calcular salários
+        const valorHoraNormal = employee.salary / 30 / 8; // Salário por hora
+        const valorHoraExtra = valorHoraNormal * 1.5; // Hora extra com 50% de acréscimo
+        
+        const salarioNormal = valorHoraNormal * totalHorasNormais;
+        const salarioExtra = valorHoraExtra * totalHorasExtras;
+        const salarioTotal = salarioNormal + salarioExtra;
 
         return {
-          id: employee._id.toString().substring(18, 24), // ID curto
-          name: employee.name,
-          department: employee.department,
-          salary: employee.salary,
+          nome: employee.name,
+          data_admissao: new Date(employee.hire_date),
           dias_trabalhados: diasTrabalhados,
-          salario_proporcional: salarioProporcional
+          horas_normais: totalHorasNormais,
+          horas_extras: totalHorasExtras,
+          salario_base: employee.salary,
+          salario_normal: salarioNormal,
+          salario_extra: salarioExtra,
+          salario_total: salarioTotal,
+          registros: records
         };
       })
     );
 
     // Criar Excel
     const workbook = new ExcelJS.Workbook();
+    
+    // Planilha principal - Folha de Pagamento
     const worksheet = workbook.addWorksheet('Folha de Pagamento');
 
-    // Configurar cabeçalhos
+    // Cabeçalhos
     worksheet.columns = [
-      { header: 'ID', key: 'id', width: 10 },
-      { header: 'Nome', key: 'name', width: 30 },
-      { header: 'Departamento', key: 'department', width: 20 },
-      { header: 'Salário Base (R$)', key: 'salary', width: 15 },
+      { header: 'Funcionário', key: 'nome', width: 25 },
+      { header: 'Data Admissão', key: 'data_admissao', width: 15 },
       { header: 'Dias Trabalhados', key: 'dias_trabalhados', width: 15 },
-      { header: 'Salário Proporcional (R$)', key: 'salario_proporcional', width: 20 }
+      { header: 'Horas Normais', key: 'horas_normais', width: 15 },
+      { header: 'Horas Extras', key: 'horas_extras', width: 15 },
+      { header: 'Salário Base', key: 'salario_base', width: 15 },
+      { header: 'Salário Normal', key: 'salario_normal', width: 15 },
+      { header: 'Hora Extra', key: 'salario_extra', width: 15 },
+      { header: 'Salário Total', key: 'salario_total', width: 15 }
     ];
 
     // Adicionar dados
-    payrollData.forEach(employee => {
-      worksheet.addRow(employee);
+    payrollData.forEach(emp => {
+      worksheet.addRow({
+        nome: emp.nome,
+        data_admissao: emp.data_admissao,
+        dias_trabalhados: emp.dias_trabalhados,
+        horas_normais: Math.round(emp.horas_normais * 100) / 100,
+        horas_extras: Math.round(emp.horas_extras * 100) / 100,
+        salario_base: emp.salario_base,
+        salario_normal: Math.round(emp.salario_normal * 100) / 100,
+        salario_extra: Math.round(emp.salario_extra * 100) / 100,
+        salario_total: Math.round(emp.salario_total * 100) / 100
+      });
     });
 
-    // Formatar números como moeda
-    worksheet.getColumn('salary').numFmt = '"R$"#,##0.00';
-    worksheet.getColumn('salario_proporcional').numFmt = '"R$"#,##0.00';
+    // Formatar números
+    [5, 6, 7, 8].forEach(colIndex => {
+      worksheet.getColumn(colIndex).numFmt = '"R$"#,##0.00';
+    });
+
+    [3, 4].forEach(colIndex => {
+      worksheet.getColumn(colIndex).numFmt = '0.00"h"';
+    });
+
+    // Formatar data
+    worksheet.getColumn(2).numFmt = 'dd/mm/yyyy';
 
     // Formatar cabeçalhos
     const headerRow = worksheet.getRow(1);
@@ -978,23 +1122,104 @@ app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (re
     // Adicionar totais
     if (payrollData.length > 0) {
       const totalRow = payrollData.length + 3;
-      worksheet.mergeCells(`A${totalRow}:D${totalRow}`);
-      worksheet.getCell(`A${totalRow}`).value = 'TOTAL GERAL:';
+      
+      worksheet.mergeCells(`A${totalRow}:E${totalRow}`);
+      worksheet.getCell(`A${totalRow}`).value = 'TOTAIS:';
       worksheet.getCell(`A${totalRow}`).font = { bold: true };
       worksheet.getCell(`A${totalRow}`).alignment = { horizontal: 'right' };
       
-      const totalSalario = payrollData.reduce((sum, emp) => sum + emp.salario_proporcional, 0);
-      worksheet.getCell(`F${totalRow}`).value = totalSalario;
-      worksheet.getCell(`F${totalRow}`).numFmt = '"R$"#,##0.00';
-      worksheet.getCell(`F${totalRow}`).font = { bold: true };
-      worksheet.getCell(`F${totalRow}`).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFF2F2F2' }
-      };
+      // Fórmulas para totais
+      worksheet.getCell(`F${totalRow}`).value = { formula: `SUM(F2:F${payrollData.length + 1})` };
+      worksheet.getCell(`G${totalRow}`).value = { formula: `SUM(G2:G${payrollData.length + 1})` };
+      worksheet.getCell(`H${totalRow}`).value = { formula: `SUM(H2:H${payrollData.length + 1})` };
+      worksheet.getCell(`I${totalRow}`).value = { formula: `SUM(I2:I${payrollData.length + 1})` };
+      
+      // Formatar células de totais
+      for (let col = 6; col <= 9; col++) {
+        worksheet.getCell(totalRow, col).font = { bold: true };
+        worksheet.getCell(totalRow, col).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF2F2F2' }
+        };
+      }
     }
 
-    // Configurar headers ANTES de escrever o Excel
+    // Planilha 2 - Detalhes dos Registros
+    const detailsWorksheet = workbook.addWorksheet('Detalhes Registros');
+
+    detailsWorksheet.columns = [
+      { header: 'Funcionário', key: 'funcionario', width: 25 },
+      { header: 'Data', key: 'data', width: 12 },
+      { header: 'Dia', key: 'dia', width: 12 },
+      { header: 'Entrada', key: 'entrada', width: 10 },
+      { header: 'Saída', key: 'saida', width: 10 },
+      { header: 'Total Horas', key: 'total_horas', width: 12 },
+      { header: 'Horas Extras', key: 'horas_extras', width: 12 }
+    ];
+
+    // Adicionar detalhes de todos os registros
+    payrollData.forEach(emp => {
+      const recordsByDay = {};
+      emp.registros.forEach(record => {
+        const dateKey = new Date(record.timestamp).toISOString().split('T')[0];
+        if (!recordsByDay[dateKey]) {
+          recordsByDay[dateKey] = [];
+        }
+        recordsByDay[dateKey].push(record);
+      });
+
+      Object.keys(recordsByDay).sort().forEach(dateKey => {
+        const dayRecords = recordsByDay[dateKey];
+        const date = new Date(dateKey);
+        const entrada = dayRecords.find(r => r.type === 'entry');
+        const saida = dayRecords.find(r => r.type === 'exit');
+
+        let totalHoras = '--:--';
+        let horasExtras = '00:00';
+
+        if (entrada && saida) {
+          const diffMs = new Date(saida.timestamp) - new Date(entrada.timestamp);
+          const diffHours = diffMs / (1000 * 60 * 60);
+          
+          const horas = Math.floor(diffHours);
+          const minutos = Math.floor((diffHours - horas) * 60);
+          totalHoras = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+          
+          if (diffHours > 8) {
+            const extraHours = diffHours - 8;
+            const extraHoras = Math.floor(extraHours);
+            const extraMinutos = Math.floor((extraHours - extraHoras) * 60);
+            horasExtras = `${extraHoras.toString().padStart(2, '0')}:${extraMinutos.toString().padStart(2, '0')}`;
+          }
+        }
+
+        detailsWorksheet.addRow({
+          funcionario: emp.nome,
+          data: date,
+          dia: date.toLocaleDateString('pt-BR', { weekday: 'long' }),
+          entrada: entrada ? new Date(entrada.timestamp).toLocaleTimeString('pt-BR') : '--:--',
+          saida: saida ? new Date(saida.timestamp).toLocaleTimeString('pt-BR') : '--:--',
+          total_horas: totalHoras,
+          horas_extras: horasExtras
+        });
+      });
+    });
+
+    // Formatar cabeçalhos da segunda planilha
+    const detailsHeader = detailsWorksheet.getRow(1);
+    detailsHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    detailsHeader.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF28A745' }
+    };
+    detailsHeader.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    // Formatar datas
+    detailsWorksheet.getColumn(2).numFmt = 'dd/mm/yyyy';
+
+    // Configurar headers
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=folha-pagamento-${month}-${year}.xlsx`);
 
