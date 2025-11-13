@@ -364,15 +364,13 @@ body {
 
 /* Badges */
 .badge {
-  padding: 10px;
+  padding: 4px 8px;
   border-radius: 4px;
   font-size: 12px;
   font-weight: normal;
 }
 
 .badge-admin {
-  padding: 10px;
-  border-radius: 4px;
   background-color: #dc3545;
   color: white;
 }
@@ -455,6 +453,8 @@ body {
     padding: 10px 15px; /* Reduz o padding */
     border-left: none; /* Remove a barra lateral */
     border-bottom: 2px solid transparent; /* Adiciona uma barra inferior para o item ativo */
+    text-decoration: none;
+    cursor: pointer;
   }
 
   .sidebar nav li a:hover,
@@ -605,13 +605,13 @@ body {
 
 .sidebar nav li a {
     display: flex;
-    align-items: center;
     gap: 15px;
     padding: 16px 25px;
     color: rgba(255, 255, 255, 0.85);
     text-decoration: none;
     transition: background-color 0.3s ease, color 0.3s ease;
     border-left: 4px solid transparent;
+    cursor: pointer;
 }
 
 .sidebar nav li a:hover,
