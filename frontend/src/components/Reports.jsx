@@ -49,22 +49,44 @@ const Reports = () => {
       const employee = employees.find(emp => emp._id === selectedEmployee);
       const url = `/api/reports/timesheet/${selectedEmployee}/pdf?start_date=${startDate}&end_date=${endDate}`;
       
-      console.log('📤 Abrindo PDF:', url);
+      console.log('📤 Gerando PDF:', url);
+      
+      // Método mais robusto para download
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/pdf',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      
+      // Criar URL temporária para o blob
+      const blobUrl = window.URL.createObjectURL(blob);
       
       // Criar link para download
       const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
+      link.href = blobUrl;
       link.download = `espelho-ponto-${employee.name.replace(/\s+/g, '_')}.pdf`;
       document.body.appendChild(link);
+      
+      // Simular clique
       link.click();
+      
+      // Limpar
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
       
       setSuccess(`PDF gerado para ${employee.name}`);
       
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      setError('Erro ao gerar PDF. Verifique o console.');
+      setError('Erro ao gerar PDF: ' + error.message);
     } finally {
       setLoading(prev => ({ ...prev, pdf: false }));
     }
@@ -78,22 +100,140 @@ const Reports = () => {
     try {
       const url = `/api/reports/payroll/excel?month=${month}&year=${year}`;
       
-      console.log('📤 Abrindo Excel:', url);
+      console.log('📤 Gerando Excel:', url);
+      
+      // Método mais robusto para download
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      
+      // Criar URL temporária para o blob
+      const blobUrl = window.URL.createObjectURL(blob);
       
       // Criar link para download
       const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
+      link.href = blobUrl;
       link.download = `folha-pagamento-${month}-${year}.xlsx`;
       document.body.appendChild(link);
+      
+      // Simular clique
       link.click();
+      
+      // Limpar
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
       
       setSuccess('Excel gerado com sucesso');
       
     } catch (error) {
       console.error('Erro ao gerar Excel:', error);
-      setError('Erro ao gerar Excel. Verifique o console.');
+      setError('Erro ao gerar Excel: ' + error.message);
+    } finally {
+      setLoading(prev => ({ ...prev, excel: false }));
+    }
+  };
+
+  // Método alternativo usando axios (se preferir)
+  const generateTimesheetPDFAlternative = async () => {
+    if (!selectedEmployee) {
+      setError('Selecione um funcionário');
+      return;
+    }
+
+    setLoading(prev => ({ ...prev, pdf: true }));
+    setError('');
+    setSuccess('');
+
+    try {
+      const employee = employees.find(emp => emp._id === selectedEmployee);
+      
+      const response = await axios({
+        method: 'GET',
+        url: `/api/reports/timesheet/${selectedEmployee}/pdf`,
+        params: {
+          start_date: startDate,
+          end_date: endDate
+        },
+        responseType: 'blob', // IMPORTANTE: especificar blob
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      // Criar blob URL
+      const blob = new Blob([response.data], { 
+        type: response.headers['content-type'] 
+      });
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      // Criar link para download
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `espelho-ponto-${employee.name.replace(/\s+/g, '_')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      
+      setSuccess(`PDF gerado para ${employee.name}`);
+      
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      setError('Erro ao gerar PDF: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setLoading(prev => ({ ...prev, pdf: false }));
+    }
+  };
+
+  const generatePayrollExcelAlternative = async () => {
+    setLoading(prev => ({ ...prev, excel: true }));
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await axios({
+        method: 'GET',
+        url: '/api/reports/payroll/excel',
+        params: {
+          month: month,
+          year: year
+        },
+        responseType: 'blob', // IMPORTANTE: especificar blob
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      // Criar blob URL
+      const blob = new Blob([response.data], { 
+        type: response.headers['content-type'] 
+      });
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      // Criar link para download
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `folha-pagamento-${month}-${year}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      
+      setSuccess('Excel gerado com sucesso');
+      
+    } catch (error) {
+      console.error('Erro ao gerar Excel:', error);
+      setError('Erro ao gerar Excel: ' + (error.response?.data?.error || error.message));
     } finally {
       setLoading(prev => ({ ...prev, excel: false }));
     }
@@ -167,7 +307,7 @@ const Reports = () => {
           
           <button 
             className="btn btn-primary"
-            onClick={generateTimesheetPDF}
+            onClick={generateTimesheetPDFAlternative} // Use a versão alternativa
             disabled={!selectedEmployee || loading.pdf}
           >
             {loading.pdf ? '⏳ Gerando PDF...' : '📥 Baixar PDF'}
@@ -220,7 +360,7 @@ const Reports = () => {
           
           <button 
             className="btn btn-primary"
-            onClick={generatePayrollExcel}
+            onClick={generatePayrollExcelAlternative} // Use a versão alternativa
             disabled={loading.excel}
           >
             {loading.excel ? '⏳ Gerando Excel...' : '📊 Baixar Excel'}
@@ -240,67 +380,21 @@ const Reports = () => {
         </div>
       </div>
 
-      <div className="info-card">
-        <h3>ℹ️ Informações sobre os Relatórios</h3>
-        <div className="info-content">
-          <div className="calculation-info">
-            <h4>🧮 Fórmulas de Cálculo Utilizadas:</h4>
-            
-            <div className="formula-group">
-              <h5>Valor Hora Normal:</h5>
-              <div className="formula">
-                <code>Salário Base ÷ 30 dias ÷ 8 horas</code>
-              </div>
-              <p>Exemplo: R$ 3.000,00 ÷ 30 ÷ 8 = <strong>R$ 12,50/hora</strong></p>
-            </div>
-
-            <div className="formula-group">
-              <h5>Valor Hora Extra:</h5>
-              <div className="formula">
-                <code>Hora Normal × 1.5 (50% de acréscimo)</code>
-              </div>
-              <p>Exemplo: R$ 12,50 × 1.5 = <strong>R$ 18,75/hora extra</strong></p>
-            </div>
-
-            <div className="formula-group">
-              <h5>Jornada de Trabalho:</h5>
-              <div className="formula">
-                <code>8 horas diárias padrão</code>
-              </div>
-              <p>Horas acima de 8h/dia são consideradas extras</p>
-            </div>
-
-            <div className="formula-group">
-              <h5>Salário Proporcional:</h5>
-              <div className="formula">
-                <code>(Horas Normais × Valor Hora) + (Horas Extras × Valor Hora Extra)</code>
-              </div>
-            </div>
-          </div>
-
-          <div className="troubleshooting">
-            <h4>🔧 Solução de Problemas:</h4>
-            <ul>
-              <li><strong>Download não inicia:</strong> Verifique o bloqueador de popups do navegador</li>
-              <li><strong>Relatório vazio:</strong> Certifique-se de existirem registros no período</li>
-              <li><strong>Erro no cálculo:</strong> Verifique se todos os dias têm entrada e saída registradas</li>
-              <li><strong>Funcionário não aparece:</strong> Confirme se há registros de ponto no mês</li>
-              <li><strong>Problemas técnicos:</strong> Verifique o console (F12) para detalhes</li>
-            </ul>
-          </div>
-
-          <div className="best-practices">
-            <h4>💡 Melhores Práticas:</h4>
-            <ul>
-              <li>Gere o espelho de ponto ao final de cada período de pagamento</li>
-              <li>Verifique os cálculos manualmente para validação</li>
-              <li>Mantenha os registros de ponto atualizados diariamente</li>
-              <li>Revise as horas extras antes do processamento</li>
-              <li>Arquive os relatórios gerados para auditoria</li>
-            </ul>
-          </div>
+      <div className="download-tips">
+        <h3>💡 Dicas para Download</h3>
+        <div className="tips-content">
+          <p><strong>Se o download não funcionar:</strong></p>
+          <ul>
+            <li>✅ Verifique se está logado no sistema</li>
+            <li>✅ Confirme as permissões do navegador para downloads</li>
+            <li>✅ Desative temporariamente o bloqueador de popups</li>
+            <li>✅ Use um navegador atualizado (Chrome, Firefox, Edge)</li>
+            <li>✅ Verifique se há registros no período selecionado</li>
+          </ul>
         </div>
       </div>
+
+      {/* ... resto do componente permanece igual */}
     </div>
   );
 };
