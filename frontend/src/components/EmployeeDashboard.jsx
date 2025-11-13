@@ -8,6 +8,7 @@ const EmployeeDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [registerLoading, setRegisterLoading] = useState(false);
+  const [lastRecord, setLastRecord] = useState(null);
 
   useEffect(() => {
     fetchEmployeeData();
@@ -61,7 +62,13 @@ const EmployeeDashboard = () => {
       await fetchEmployeeData();
       await fetchRecentRecords();
       
-      alert(`✅ ${type === 'entry' ? 'Entrada' : 'Saída'} registrada com sucesso!`);
+      // Mostrar último registro
+      setLastRecord({
+        type,
+        timestamp: new Date().toLocaleString('pt-BR'),
+        employee: employeeData?.name
+      });
+      
     } catch (error) {
       console.error('Erro ao registrar ponto:', error);
       setError(error.response?.data?.error || 'Erro ao registrar ponto');
@@ -118,6 +125,15 @@ const EmployeeDashboard = () => {
                 📤 {registerLoading ? 'Registrando...' : 'Registrar Saída'}
               </button>
             </div>
+
+            {lastRecord && (
+              <div className="last-record">
+                <h4>✅ Último registro confirmado:</h4>
+                <p><strong>Funcionário:</strong> {lastRecord.employee}</p>
+                <p><strong>Tipo:</strong> {lastRecord.type === 'entry' ? 'Entrada' : 'Saída'}</p>
+                <p><strong>Horário:</strong> {lastRecord.timestamp}</p>
+              </div>
+            )}
           </div>
 
           <div className="recent-section">
@@ -126,10 +142,12 @@ const EmployeeDashboard = () => {
               {recentRecords.length > 0 ? (
                 recentRecords.map(record => (
                   <div key={record._id} className="recent-item">
-                    <strong>
-                      {new Date(record.timestamp).toLocaleDateString('pt-BR')} - 
-                      {new Date(record.timestamp).toLocaleTimeString('pt-BR')}
-                    </strong>
+                    <div>
+                      <strong>
+                        {new Date(record.timestamp).toLocaleDateString('pt-BR')} - 
+                        {new Date(record.timestamp).toLocaleTimeString('pt-BR')}
+                      </strong>
+                    </div>
                     <span className={`record-type ${record.type}`}>
                       {record.type === 'entry' ? '🟢 ENTRADA' : '🔴 SAÍDA'}
                     </span>
@@ -156,7 +174,7 @@ const EmployeeDashboard = () => {
           <li>Registre sua <strong>entrada</strong> ao chegar no trabalho</li>
           <li>Registre sua <strong>saída</strong> ao sair do trabalho</li>
           <li>Seus registros ficam salvos automaticamente</li>
-          <li>Visualize seu histórico abaixo</li>
+          <li>Visualize seu histórico acima</li>
         </ul>
       </div>
     </div>

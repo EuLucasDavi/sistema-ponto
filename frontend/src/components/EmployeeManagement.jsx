@@ -21,13 +21,16 @@ const EmployeeManagement = () => {
 
   const fetchEmployees = async () => {
     try {
-      setError('');
-      const response = await axios.get('/api/employees');
-      setEmployees(response.data);
-    } catch (error) {
-      console.error('Erro ao buscar funcionários:', error);
-      setError('Erro ao carregar funcionários');
-    }
+    console.log('🔍 Buscando lista de funcionários...');
+    setError('');
+    const response = await axios.get('/api/employees');
+    console.log('✅ Funcionários carregados:', response.data.length);
+    setEmployees(response.data);
+  } catch (error) {
+    console.error('❌ Erro ao buscar funcionários:', error);
+    console.error('📡 Detalhes do erro:', error.response?.data);
+    setError('Erro ao carregar funcionários: ' + (error.response?.data?.error || error.message));
+  }
   };
 
   const handleSubmit = async (e) => {

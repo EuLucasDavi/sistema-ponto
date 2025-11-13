@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchDashboardStats();
@@ -64,7 +66,7 @@ const Dashboard = () => {
         <div className="recent-section">
           <h2>👥 Funcionários Recentes</h2>
           <div className="recent-list">
-            {stats.recentEmployees.length > 0 ? (
+            {stats.recentEmployees && stats.recentEmployees.length > 0 ? (
               stats.recentEmployees.map(employee => (
                 <div key={employee._id} className="recent-item">
                   <strong>{employee.name}</strong>
@@ -87,19 +89,19 @@ const Dashboard = () => {
           <div className="quick-actions">
             <button 
               className="btn btn-primary"
-              onClick={() => window.location.href = '/employees'}
+              onClick={() => navigate('/employees')}
             >
               👥 Gerenciar Funcionários
             </button>
             <button 
               className="btn btn-primary"
-              onClick={() => window.location.href = '/users'}
+              onClick={() => navigate('/users')}
             >
               👤 Gerenciar Usuários
             </button>
             <button 
               className="btn btn-primary"
-              onClick={() => window.location.href = '/reports'}
+              onClick={() => navigate('/reports')}
             >
               📈 Gerar Relatórios
             </button>
@@ -150,10 +152,35 @@ const Dashboard = () => {
           <div className="quick-actions">
             <button 
               className="btn btn-primary"
-              onClick={() => window.location.href = '/my-time'}
+              onClick={() => navigate('/my-time')}
             >
               ⏰ Registrar Meu Ponto
             </button>
+          </div>
+
+          <div className="recent-section">
+            <h3>📋 Meus Últimos Registros</h3>
+            <div className="recent-list">
+              {stats.recentRecords && stats.recentRecords.length > 0 ? (
+                stats.recentRecords.map(record => (
+                  <div key={record._id} className="recent-item">
+                    <div>
+                      <strong>
+                        {new Date(record.timestamp).toLocaleDateString('pt-BR')} - 
+                        {new Date(record.timestamp).toLocaleTimeString('pt-BR')}
+                      </strong>
+                    </div>
+                    <span className={`record-type ${record.type}`}>
+                      {record.type === 'entry' ? '🟢 ENTRADA' : '🔴 SAÍDA'}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="recent-item">
+                  <span>Nenhum registro encontrado hoje</span>
+                </div>
+              )}
+            </div>
           </div>
         </>
       ) : (

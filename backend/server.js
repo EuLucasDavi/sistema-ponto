@@ -293,14 +293,20 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 // ==================== ROTAS DE FUNCIONÁRIOS (APENAS ADMIN) ====================
-app.get('/api/employees', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/employees', authenticateToken, async (req, res) => {
   try {
+    console.log('👥 Buscando lista de funcionários...');
+    console.log('👤 Usuário:', req.user.username, 'Role:', req.user.role);
+    
     const employees = await db.collection('employees')
       .find()
       .sort({ name: 1 })
       .toArray();
+    
+    console.log(`✅ Encontrados ${employees.length} funcionários`);
     res.json(employees);
   } catch (error) {
+    console.error('❌ Erro ao buscar funcionários:', error);
     res.status(500).json({ error: error.message });
   }
 });
