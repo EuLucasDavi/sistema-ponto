@@ -7,29 +7,32 @@ import { MongoClient, ObjectId } from 'mongodb';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 
+// Configurar dotenv primeiro
 dotenv.config();
 
 const app = express();
 
-// CORS config para produção
+// CORS - Permitir tudo para teste
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://sistema-ponto-frontend.vercel.app',
-    'https://*.vercel.app'
-  ],
-  credentials: true
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
 
 // Conexão com MongoDB
 let db;
+let mongoClient;
+
 const connectToMongoDB = async () => {
   try {
-    const client = new MongoClient(process.env.MONGODB_URI);
-    await client.connect();
-    db = client.db('sistema_ponto');
+    console.log('🔗 Conectando ao MongoDB...');
+    console.log('📡 MongoDB URI:', process.env.MONGODB_URI ? '✅ Configurada' : '❌ Não configurada');
+    
+    mongoClient = new MongoClient(process.env.MONGODB_URI);
+    await mongoClient.connect();
+    db = mongoClient.db('sistema_ponto');
     console.log('✅ Conectado ao MongoDB Atlas com sucesso!');
     
     // Criar índices
@@ -37,30 +40,33 @@ const connectToMongoDB = async () => {
     await db.collection('employees').createIndex({ email: 1 }, { unique: true });
     await db.collection('time_records').createIndex({ employee_id: 1, timestamp: 1 });
     
-    // Criar usuário admin padrão se não existir
+    // Criar usuário admin padrão
     await createDefaultAdmin();
   } catch (error) {
-    console.error('❌ Erro ao conectar com MongoDB:', error);
-    process.exit(1);
+    console.error('❌ Erro ao conectar com MongoDB:', error.message);
+    console.error('💡 Dica: Verifique a string de conexão no Render');
   }
 };
 
 const createDefaultAdmin = async () => {
-  const adminExists = await db.collection('users').findOne({ username: 'admin' });
-  if (!adminExists) {
-    const hashedPassword = await bcrypt.hash('admin123', 10);
-    await db.collection('users').insertOne({
-      username: 'admin',
-      password: hashedPassword,
-      role: 'admin',
-      created_at: new Date()
-    });
-    console.log('👤 Usuário admin criado: admin / admin123');
+  try {
+    const adminExists = await db.collection('users').findOne({ username: 'admin' });
+    if (!adminExists) {
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      await db.collection('users').insertOne({
+        username: 'admin',
+        password: hashedPassword,
+        role: 'admin',
+        created_at: new Date()
+      });
+      console.log('👤 Usuário admin criado: admin / admin123');
+    } else {
+      console.log('👤 Usuário admin já existe');
+    }
+  } catch (error) {
+    console.error('❌ Erro ao criar admin:', error);
   }
 };
-
-// Inicializar conexão
-connectToMongoDB();
 
 // Middleware de autenticação
 const authenticateToken = (req, res, next) => {
@@ -80,40 +86,92 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Health check route para Render
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-    database: db ? 'Connected' : 'Disconnected'
+// Health check melhorado
+app.get('/health', async (req, res) => {
+  try {
+    let dbStatus = 'Disconnected';
+    let dbError = null;
+
+    if (db) {
+      try {
+        await db.command({ ping: 1 });
+        dbStatus = 'Connected';
+      } catch (error) {
+        dbStatus = 'Error';
+        dbError = error.message;
+      }
+    }
+
+    res.json({ 
+      status: 'OK',
+      service: 'Sistema Ponto Backend',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      database: dbStatus,
+      databaseError: dbError,
+      version: '1.0.0'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'Error',
+      error: error.message 
+    });
+  }
+});
+
+// Rota raiz - Redireciona para health
+app.get('/', (req, res) => {
+  res.redirect('/health');
+});
+
+// Rota simples para testar se a API está respondendo
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    message: 'API está funcionando!',
+    timestamp: new Date().toISOString()
   });
 });
 
-// Rotas de Autenticação
+// ==================== ROTAS DE AUTENTICAÇÃO ====================
 app.post('/api/login', async (req, res) => {
+  console.log('🔐 Recebida requisição de login');
+  
   const { username, password } = req.body;
 
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username e password são obrigatórios' });
+  }
+
   try {
+    // Verificar se o MongoDB está conectado
+    if (!db) {
+      return res.status(500).json({ error: 'Database não conectado' });
+    }
+
     const user = await db.collection('users').findOne({ username });
 
     if (!user) {
+      console.log('❌ Usuário não encontrado:', username);
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
     const validPassword = await bcrypt.compare(password, user.password);
 
     if (!validPassword) {
+      console.log('❌ Senha inválida para usuário:', username);
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
     const token = jwt.sign(
       { id: user._id.toString(), username: user.username, role: user.role },
-      process.env.JWT_SECRET || 'secret',
+      process.env.JWT_SECRET || 'fallback-secret',
       { expiresIn: '24h' }
     );
 
+    console.log('✅ Login bem-sucedido:', username);
+
     res.json({ 
+      success: true,
       token, 
       user: { 
         id: user._id, 
@@ -122,11 +180,12 @@ app.post('/api/login', async (req, res) => {
       } 
     });
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    console.error('❌ Erro no login:', error);
+    res.status(500).json({ error: 'Erro interno do servidor: ' + error.message });
   }
 });
 
-// Rotas de Funcionários
+// ==================== ROTAS DE FUNCIONÁRIOS ====================
 app.get('/api/employees', authenticateToken, async (req, res) => {
   try {
     const employees = await db.collection('employees')
@@ -214,7 +273,7 @@ app.delete('/api/employees/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Rotas de Registro de Ponto
+// ==================== ROTAS DE REGISTRO DE PONTO ====================
 app.post('/api/time-records', authenticateToken, async (req, res) => {
   const { employee_id, type } = req.body;
   const timestamp = new Date();
@@ -256,7 +315,7 @@ app.get('/api/time-records/:employee_id', authenticateToken, async (req, res) =>
   }
 });
 
-// Geração de Relatórios PDF (Espelho de Ponto)
+// ==================== RELATÓRIOS PDF ====================
 app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, async (req, res) => {
   const { employee_id } = req.params;
   const { start_date, end_date } = req.query;
@@ -281,12 +340,14 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, async (req
       .sort({ timestamp: 1 })
       .toArray();
 
+    // Criar PDF
     const doc = new PDFDocument();
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=espelho-ponto-${employee.name}.pdf`);
 
     doc.pipe(res);
 
+    // Cabeçalho
     doc.fontSize(20).text('ESPELHO DE PONTO', { align: 'center' });
     doc.moveDown();
     doc.fontSize(12).text(`Funcionário: ${employee.name}`);
@@ -297,6 +358,7 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, async (req
 
     let yPosition = 200;
     
+    // Cabeçalho da tabela
     doc.fontSize(10).font('Helvetica-Bold');
     doc.text('Data', 50, yPosition);
     doc.text('Hora', 150, yPosition);
@@ -307,6 +369,7 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, async (req
     doc.moveTo(50, yPosition).lineTo(450, yPosition).stroke();
     doc.font('Helvetica');
 
+    // Registros
     records.forEach(record => {
       yPosition += 20;
       if (yPosition > 700) {
@@ -325,6 +388,7 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, async (req
       doc.text(dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1), 320, yPosition);
     });
 
+    // Resumo
     yPosition += 40;
     doc.font('Helvetica-Bold').text('RESUMO:', 50, yPosition);
     doc.font('Helvetica');
@@ -339,7 +403,7 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, async (req
   }
 });
 
-// Geração de Relatórios Excel (Folha de Pagamento)
+// ==================== RELATÓRIOS EXCEL ====================
 app.get('/api/reports/payroll/excel', authenticateToken, async (req, res) => {
   const { month, year } = req.query;
 
@@ -347,8 +411,10 @@ app.get('/api/reports/payroll/excel', authenticateToken, async (req, res) => {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
+    // Buscar todos os funcionários
     const employees = await db.collection('employees').find().toArray();
 
+    // Para cada funcionário, calcular dias trabalhados
     const payrollData = await Promise.all(
       employees.map(async (employee) => {
         const records = await db.collection('time_records')
@@ -373,9 +439,11 @@ app.get('/api/reports/payroll/excel', authenticateToken, async (req, res) => {
       })
     );
 
+    // Criar Excel
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Folha de Pagamento');
 
+    // Cabeçalhos
     worksheet.columns = [
       { header: 'ID', key: 'id', width: 10 },
       { header: 'Nome', key: 'name', width: 30 },
@@ -385,13 +453,16 @@ app.get('/api/reports/payroll/excel', authenticateToken, async (req, res) => {
       { header: 'Salário Proporcional (R$)', key: 'salario_proporcional', width: 20 }
     ];
 
+    // Dados
     payrollData.forEach(employee => {
       worksheet.addRow(employee);
     });
 
+    // Formatar números como moeda
     worksheet.getColumn('salary').numFmt = '"R$"#,##0.00';
     worksheet.getColumn('salario_proporcional').numFmt = '"R$"#,##0.00';
 
+    // Formatar cabeçalhos
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).fill = {
       type: 'pattern',
@@ -399,6 +470,7 @@ app.get('/api/reports/payroll/excel', authenticateToken, async (req, res) => {
       fgColor: { argb: 'FFE6E6FA' }
     };
 
+    // Adicionar totais
     const totalRow = payrollData.length + 3;
     worksheet.getCell(`E${totalRow}`).value = 'TOTAL:';
     worksheet.getCell(`E${totalRow}`).font = { bold: true };
@@ -418,10 +490,11 @@ app.get('/api/reports/payroll/excel', authenticateToken, async (req, res) => {
   }
 });
 
-// Rota para dashboard
+// ==================== DASHBOARD ====================
 app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
   try {
     const totalEmployees = await db.collection('employees').countDocuments();
+    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -446,17 +519,36 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
   }
 });
 
-// Rota raiz
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Sistema de Ponto API', 
-    version: '1.0.0',
-    status: 'Online',
-    environment: process.env.NODE_ENV
-  });
-});
+// ==================== INICIALIZAÇÃO DO SERVIDOR ====================
+const startServer = async () => {
+  try {
+    await connectToMongoDB();
+    
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+      console.log('🚀 =================================');
+      console.log('🚀 Sistema de Ponto Backend Iniciado');
+      console.log('🚀 =================================');
+      console.log(`📍 Porta: ${PORT}`);
+      console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🗄️  Database: ${db ? 'Conectado' : 'Desconectado'}`);
+      console.log(`🔗 Health Check: http://localhost:${PORT}/health`);
+      console.log('✅ Backend pronto para receber requisições!');
+    });
+  } catch (error) {
+    console.error('❌ Falha ao iniciar servidor:', error);
+    process.exit(1);
+  }
+};
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT} em modo ${process.env.NODE_ENV}`);
+// Iniciar servidor
+startServer();
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('🛑 Recebido SIGTERM, encerrando servidor...');
+  if (mongoClient) {
+    await mongoClient.close();
+  }
+  process.exit(0);
 });

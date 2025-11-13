@@ -74,14 +74,6 @@ const Login = () => {
         >
           {loading ? 'Entrando...' : 'Entrar'}
         </button>
-
-        <div style={{ marginTop: '20px', padding: '15px', background: '#f8f9fa', borderRadius: '5px' }}>
-          <strong>Credenciais padrão:</strong>
-          <br />
-          Usuário: <code>admin</code>
-          <br />
-          Senha: <code>admin123</code>
-        </div>
       </form>
     </div>
   );

@@ -7,10 +7,10 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "build": "echo 'No build step needed for backend'"
+    "build": "echo 'No build step needed'"
   },
   "keywords": ["ponto", "eletrônico", "node", "mongodb"],
-  "author": "Seu Nome",
+  "author": "Lucas Davi",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
