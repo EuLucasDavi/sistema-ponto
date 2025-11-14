@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import {
+  FiFileText,
+  FiDownload,
+  FiUsers,
+  FiCalendar,
+  FiDollarSign,
+  FiCheckCircle,
+  FiAlertCircle,
+  FiClock,
+  FiBarChart2,
+  FiSettings,
+  FiUser,
+  FiInfo
+} from 'react-icons/fi';
 
 const Reports = () => {
   const [employees, setEmployees] = useState([]);
@@ -47,115 +61,6 @@ const Reports = () => {
 
     try {
       const employee = employees.find(emp => emp._id === selectedEmployee);
-      const url = `/api/reports/timesheet/${selectedEmployee}/pdf?start_date=${startDate}&end_date=${endDate}`;
-      
-      console.log('📤 Gerando PDF:', url);
-      
-      // Método mais robusto para download
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/pdf',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      
-      // Criar URL temporária para o blob
-      const blobUrl = window.URL.createObjectURL(blob);
-      
-      // Criar link para download
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `espelho-ponto-${employee.name.replace(/\s+/g, '_')}.pdf`;
-      document.body.appendChild(link);
-      
-      // Simular clique
-      link.click();
-      
-      // Limpar
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-      
-      setSuccess(`PDF gerado para ${employee.name}`);
-      
-    } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
-      setError('Erro ao gerar PDF: ' + error.message);
-    } finally {
-      setLoading(prev => ({ ...prev, pdf: false }));
-    }
-  };
-
-  const generatePayrollExcel = async () => {
-    setLoading(prev => ({ ...prev, excel: true }));
-    setError('');
-    setSuccess('');
-
-    try {
-      const url = `/api/reports/payroll/excel?month=${month}&year=${year}`;
-      
-      console.log('📤 Gerando Excel:', url);
-      
-      // Método mais robusto para download
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      
-      // Criar URL temporária para o blob
-      const blobUrl = window.URL.createObjectURL(blob);
-      
-      // Criar link para download
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `folha-pagamento-${month}-${year}.xlsx`;
-      document.body.appendChild(link);
-      
-      // Simular clique
-      link.click();
-      
-      // Limpar
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-      
-      setSuccess('Excel gerado com sucesso');
-      
-    } catch (error) {
-      console.error('Erro ao gerar Excel:', error);
-      setError('Erro ao gerar Excel: ' + error.message);
-    } finally {
-      setLoading(prev => ({ ...prev, excel: false }));
-    }
-  };
-
-  // Método alternativo usando axios (se preferir)
-  const generateTimesheetPDFAlternative = async () => {
-    if (!selectedEmployee) {
-      setError('Selecione um funcionário');
-      return;
-    }
-
-    setLoading(prev => ({ ...prev, pdf: true }));
-    setError('');
-    setSuccess('');
-
-    try {
-      const employee = employees.find(emp => emp._id === selectedEmployee);
       
       const response = await axios({
         method: 'GET',
@@ -164,7 +69,7 @@ const Reports = () => {
           start_date: startDate,
           end_date: endDate
         },
-        responseType: 'blob', // IMPORTANTE: especificar blob
+        responseType: 'blob',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -195,7 +100,7 @@ const Reports = () => {
     }
   };
 
-  const generatePayrollExcelAlternative = async () => {
+  const generatePayrollExcel = async () => {
     setLoading(prev => ({ ...prev, excel: true }));
     setError('');
     setSuccess('');
@@ -208,7 +113,7 @@ const Reports = () => {
           month: month,
           year: year
         },
-        responseType: 'blob', // IMPORTANTE: especificar blob
+        responseType: 'blob',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -247,30 +152,47 @@ const Reports = () => {
   return (
     <div className="container">
       <div className="header">
-        <h1>📈 Relatórios</h1>
-        <p>Gere relatórios profissionais em PDF e Excel</p>
+        <div className="header-title">
+          <FiBarChart2 size={32} className="header-icon" />
+          <div>
+            <h1>Relatórios</h1>
+            <p>Gere relatórios profissionais em PDF e Excel</p>
+          </div>
+        </div>
       </div>
 
       {error && (
         <div className="error-message">
-          ❌ {error}
+          <FiAlertCircle size={18} />
+          <span>{error}</span>
         </div>
       )}
 
       {success && (
         <div className="success-message">
-          ✅ {success}
+          <FiCheckCircle size={18} />
+          <span>{success}</span>
         </div>
       )}
 
       <div className="reports-grid">
         {/* Espelho de Ponto */}
         <div className="report-card">
-          <h2>📄 Espelho de Ponto (PDF)</h2>
-          <p>Gere o espelho de ponto individual em formato profissional</p>
+          <div className="report-card-header">
+            <div className="report-icon">
+              <FiFileText size={24} />
+            </div>
+            <div>
+              <h2>Espelho de Ponto</h2>
+              <p>Gere o espelho de ponto individual em formato profissional</p>
+            </div>
+          </div>
           
           <div className="form-group">
-            <label>Funcionário:</label>
+            <label>
+              <FiUser size={16} />
+              Funcionário:
+            </label>
             <select 
               value={selectedEmployee} 
               onChange={(e) => setSelectedEmployee(e.target.value)}
@@ -285,54 +207,103 @@ const Reports = () => {
             </select>
           </div>
           
-          <div className="form-group">
-            <label>Data Início:</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              disabled={loading.pdf}
-            />
-          </div>
-          
-          <div className="form-group">
-            <label>Data Fim:</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              disabled={loading.pdf}
-            />
+          <div className="date-range">
+            <div className="form-group">
+              <label>
+                <FiCalendar size={16} />
+                Data Início:
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                disabled={loading.pdf}
+              />
+            </div>
+            
+            <div className="form-group">
+              <label>
+                <FiCalendar size={16} />
+                Data Fim:
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                disabled={loading.pdf}
+              />
+            </div>
           </div>
           
           <button 
-            className="btn btn-primary"
-            onClick={generateTimesheetPDFAlternative} // Use a versão alternativa
+            className="btn btn-primary btn-large"
+            onClick={generateTimesheetPDF}
             disabled={!selectedEmployee || loading.pdf}
           >
-            {loading.pdf ? '⏳ Gerando PDF...' : '📥 Baixar PDF'}
+            {loading.pdf ? (
+              <>
+                <div className="loading-spinner"></div>
+                <span>Gerando PDF...</span>
+              </>
+            ) : (
+              <>
+                <FiDownload size={20} />
+                <span>Baixar PDF</span>
+              </>
+            )}
           </button>
 
           <div className="report-features">
-            <h4>📋 Características do PDF:</h4>
+            <div className="section-header">
+              <FiCheckCircle size={20} />
+              <h4>Características do PDF</h4>
+            </div>
             <ul>
-              <li>✅ Formato profissional de espelho de ponto</li>
-              <li>✅ Cálculo automático de horas trabalhadas</li>
-              <li>✅ Controle de horas extras</li>
-              <li>✅ Totais consolidados do período</li>
-              <li>✅ Espaço para assinaturas</li>
-              <li>✅ Layout otimizado para impressão</li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Formato profissional de espelho de ponto
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Cálculo automático de horas trabalhadas
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Controle de horas extras
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Totais consolidados do período
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Espaço para assinaturas
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Layout otimizado para impressão
+              </li>
             </ul>
           </div>
         </div>
 
         {/* Folha de Pagamento */}
         <div className="report-card">
-          <h2>💰 Folha de Pagamento (Excel)</h2>
-          <p>Gere a folha de pagamento completa com cálculos automáticos</p>
+          <div className="report-card-header">
+            <div className="report-icon">
+              <FiDollarSign size={24} />
+            </div>
+            <div>
+              <h2>Folha de Pagamento</h2>
+              <p>Gere a folha de pagamento completa com cálculos automáticos</p>
+            </div>
+          </div>
           
           <div className="form-group">
-            <label>Mês:</label>
+            <label>
+              <FiCalendar size={16} />
+              Mês:
+            </label>
             <select 
               value={month} 
               onChange={(e) => setMonth(e.target.value)}
@@ -347,7 +318,10 @@ const Reports = () => {
           </div>
           
           <div className="form-group">
-            <label>Ano:</label>
+            <label>
+              <FiCalendar size={16} />
+              Ano:
+            </label>
             <input
               type="number"
               value={year}
@@ -359,42 +333,89 @@ const Reports = () => {
           </div>
           
           <button 
-            className="btn btn-primary"
-            onClick={generatePayrollExcelAlternative} // Use a versão alternativa
+            className="btn btn-primary btn-large"
+            onClick={generatePayrollExcel}
             disabled={loading.excel}
           >
-            {loading.excel ? '⏳ Gerando Excel...' : '📊 Baixar Excel'}
+            {loading.excel ? (
+              <>
+                <div className="loading-spinner"></div>
+                <span>Gerando Excel...</span>
+              </>
+            ) : (
+              <>
+                <FiDownload size={20} />
+                <span>Baixar Excel</span>
+              </>
+            )}
           </button>
 
           <div className="report-features">
-            <h4>📊 Características do Excel:</h4>
+            <div className="section-header">
+              <FiCheckCircle size={20} />
+              <h4>Características do Excel</h4>
+            </div>
             <ul>
-              <li>✅ <strong>2 Planilhas:</strong> Resumo + Detalhes</li>
-              <li>✅ Cálculo automático de horas extras (50%)</li>
-              <li>✅ Salário proporcional às horas trabalhadas</li>
-              <li>✅ Base de 8 horas diárias</li>
-              <li>✅ Totais consolidados automáticos</li>
-              <li>✅ Formatação profissional</li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                <strong>2 Planilhas:</strong> Resumo + Detalhes
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Cálculo automático de horas extras (50%)
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Salário proporcional às horas trabalhadas
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Base de 8 horas diárias
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Totais consolidados automáticos
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Formatação profissional
+              </li>
             </ul>
           </div>
         </div>
       </div>
 
-      <div className="download-tips">
-        <h3>💡 Dicas para Download</h3>
+      <div className="info-card tips-card">
+        <div className="section-header">
+          <FiInfo size={24} />
+          <h3>Dicas para Download</h3>
+        </div>
         <div className="tips-content">
           <p><strong>Se o download não funcionar:</strong></p>
           <ul>
-            <li>✅ Verifique se está logado no sistema</li>
-            <li>✅ Confirme as permissões do navegador para downloads</li>
-            <li>✅ Desative temporariamente o bloqueador de popups</li>
-            <li>✅ Use um navegador atualizado (Chrome, Firefox, Edge)</li>
-            <li>✅ Verifique se há registros no período selecionado</li>
+            <li>
+              <FiCheckCircle size={16} color="#28a745" />
+              Verifique se está logado no sistema
+            </li>
+            <li>
+              <FiCheckCircle size={16} color="#28a745" />
+              Confirme as permissões do navegador para downloads
+            </li>
+            <li>
+              <FiCheckCircle size={16} color="#28a745" />
+              Desative temporariamente o bloqueador de popups
+            </li>
+            <li>
+              <FiCheckCircle size={16} color="#28a745" />
+              Use um navegador atualizado (Chrome, Firefox, Edge)
+            </li>
+            <li>
+              <FiCheckCircle size={16} color="#28a745" />
+              Verifique se há registros no período selecionado
+            </li>
           </ul>
         </div>
       </div>
-
-      {/* ... resto do componente permanece igual */}
     </div>
   );
 };
