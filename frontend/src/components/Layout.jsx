@@ -49,7 +49,7 @@ const Layout = ({ children }) => {
         <div className="sidebar-header">
           <div className="logo">
             <FiBriefcase size={28} />
-            <h1>Sistema Ponto</h1>
+            <h1>Ponto Max</h1>
           </div>
           <p>{user?.role === 'admin' ? 'Painel Admin' : 'Meu Painel'}</p>
         </div>
@@ -161,7 +161,7 @@ const Layout = ({ children }) => {
       <main className="main-content">
         <header className="navbar">
           <div className="navbar-left">
-            <h2>Sistema de Ponto Eletrônico</h2>
+            <h2>Ponto Max | Gestão de Jornada</h2>
           </div>
           
           <div className="navbar-user">

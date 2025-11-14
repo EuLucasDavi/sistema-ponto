@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import {FiBarChart} from 'react-icons/fi';
 
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
@@ -39,7 +40,7 @@ const Dashboard = () => {
     return (
       <div className="container">
         <div className="header">
-          <h1>📊 Dashboard Administrativo</h1>
+          <h1><FiBarChart size={20} /> Dashboard Administrativo</h1>
           <p>Visão geral do sistema</p>
         </div>
 
