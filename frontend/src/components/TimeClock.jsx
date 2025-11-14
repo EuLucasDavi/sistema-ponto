@@ -20,6 +20,7 @@ const TimeClock = () => {
   const [lastRecord, setLastRecord] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [lastRecordType, setLastRecordType] = useState(null);
 
   useEffect(() => {
     fetchEmployees();
@@ -57,6 +58,7 @@ const TimeClock = () => {
         timestamp: now.toLocaleString('pt-BR'),
         employee: employees.find(emp => emp._id === selectedEmployee)?.name
       });
+      setLastRecordType(type);
       
     } catch (error) {
       console.error('Erro ao registrar ponto:', error);
@@ -65,6 +67,38 @@ const TimeClock = () => {
       setLoading(false);
     }
   };
+
+  // Buscar último registro do funcionário selecionado
+  useEffect(() => {
+    const fetchLastRecord = async () => {
+      if (!selectedEmployee) {
+        setLastRecordType(null);
+        return;
+      }
+
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const response = await axios.get('/api/time-records', {
+          params: {
+            employee_id: selectedEmployee,
+            start_date: today,
+            end_date: today
+          }
+        });
+        
+        if (response.data && response.data.length > 0) {
+          setLastRecordType(response.data[response.data.length - 1].type);
+        } else {
+          setLastRecordType(null);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar último registro:', error);
+        setLastRecordType(null);
+      }
+    };
+
+    fetchLastRecord();
+  }, [selectedEmployee]);
 
   const getCurrentTime = () => {
     return new Date().toLocaleTimeString('pt-BR', {
@@ -138,61 +172,69 @@ const TimeClock = () => {
             </select>
           </div>
 
-          <div className="time-buttons">
-            <button 
-              className="btn btn-success btn-large"
-              onClick={() => registerTime('entry')}
-              disabled={loading || !selectedEmployee}
-            >
-              {loading ? (
-                <>
-                  <div className="loading-spinner"></div>
-                  <span>Registrando...</span>
-                </>
-              ) : (
-                <>
-                  <FiLogIn size={20} />
-                  <span>Registrar Entrada</span>
-                </>
+          {selectedEmployee && (
+            <div className="time-buttons">
+              {(!lastRecordType || lastRecordType === 'exit') && (
+                <button 
+                  className="btn btn-success btn-large"
+                  onClick={() => registerTime('entry')}
+                  disabled={loading || !selectedEmployee}
+                >
+                  {loading ? (
+                    <>
+                      <div className="loading-spinner"></div>
+                      <span>Registrando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FiLogIn size={20} />
+                      <span>Registrar Entrada</span>
+                    </>
+                  )}
+                </button>
               )}
-            </button>
-            
-            <button 
-              className="btn btn-warning btn-large"
-              onClick={() => registerTime('pause')}
-              disabled={loading || !selectedEmployee}
-            >
-              {loading ? (
-                <>
-                  <div className="loading-spinner"></div>
-                  <span>Registrando...</span>
-                </>
-              ) : (
-                <>
-                  <FiPauseCircle size={20} />
-                  <span>Registrar Pausa</span>
-                </>
+              
+              {lastRecordType === 'entry' && (
+                <button 
+                  className="btn btn-warning btn-large"
+                  onClick={() => registerTime('pause')}
+                  disabled={loading || !selectedEmployee}
+                >
+                  {loading ? (
+                    <>
+                      <div className="loading-spinner"></div>
+                      <span>Registrando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FiPauseCircle size={20} />
+                      <span>Registrar Pausa</span>
+                    </>
+                  )}
+                </button>
               )}
-            </button>
-            
-            <button 
-              className="btn btn-danger btn-large"
-              onClick={() => registerTime('exit')}
-              disabled={loading || !selectedEmployee}
-            >
-              {loading ? (
-                <>
-                  <div className="loading-spinner"></div>
-                  <span>Registrando...</span>
-                </>
-              ) : (
-                <>
-                  <FiLogOut size={20} />
-                  <span>Registrar Saída</span>
-                </>
+              
+              {(lastRecordType === 'entry' || lastRecordType === 'pause') && (
+                <button 
+                  className={lastRecordType === 'pause' ? 'btn btn-success btn-large' : 'btn btn-danger btn-large'}
+                  onClick={() => registerTime(lastRecordType === 'pause' ? 'entry' : 'exit')}
+                  disabled={loading || !selectedEmployee}
+                >
+                  {loading ? (
+                    <>
+                      <div className="loading-spinner"></div>
+                      <span>Registrando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FiLogOut size={20} />
+                      <span>{lastRecordType === 'pause' ? 'Registrar Retorno' : 'Registrar Saída'}</span>
+                    </>
+                  )}
+                </button>
               )}
-            </button>
-          </div>
+            </div>
+          )}
 
           {lastRecord && (
             <div className="last-record-card">

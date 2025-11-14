@@ -947,20 +947,25 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, requireAdm
     const colWidth = pageWidth / 6;
 
     // Cabeçalho da tabela
-    doc.fontSize(9).font('Helvetica-Bold');
+    const pageWidthNew = doc.page.width - 100;
+    const colWidthNew = pageWidthNew / 8;
+    
+    doc.fontSize(8).font('Helvetica-Bold');
     doc.text('DATA', 50, yPosition);
-    doc.text('DIA', 50 + colWidth, yPosition);
-    doc.text('ENTRADA', 50 + colWidth * 2, yPosition);
-    doc.text('SAÍDA', 50 + colWidth * 3, yPosition);
-    doc.text('TOTAL', 50 + colWidth * 4, yPosition);
-    doc.text('H. EXTRA', 50 + colWidth * 5, yPosition);
+    doc.text('DIA', 50 + colWidthNew, yPosition);
+    doc.text('ENTRADA', 50 + colWidthNew * 2, yPosition);
+    doc.text('PAUSA', 50 + colWidthNew * 3, yPosition);
+    doc.text('RETORNO', 50 + colWidthNew * 4, yPosition);
+    doc.text('SAÍDA', 50 + colWidthNew * 5, yPosition);
+    doc.text('TOTAL', 50 + colWidthNew * 6, yPosition);
+    doc.text('H. EXTRA', 50 + colWidthNew * 7, yPosition);
     
     yPosition += 15;
-    doc.moveTo(50, yPosition).lineTo(50 + pageWidth, yPosition).stroke();
+    doc.moveTo(50, yPosition).lineTo(50 + pageWidthNew, yPosition).stroke();
     yPosition += 10;
 
     // Linhas da tabela
-    doc.fontSize(8).font('Helvetica');
+    doc.fontSize(7).font('Helvetica');
     
     let totalHorasNormais = 0;
     let totalHorasExtras = 0;
@@ -971,8 +976,9 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, requireAdm
       const date = new Date(dateKey);
       const dayName = date.toLocaleDateString('pt-BR', { weekday: 'long' });
       
-      // Encontrar entrada e saída do dia
-      const entrada = dayRecords.find(r => r.type === 'entry');
+      // Encontrar entrada, pausa e saída do dia
+      const entradas = dayRecords.filter(r => r.type === 'entry');
+      const pausas = dayRecords.filter(r => r.type === 'pause');
       const saida = dayRecords.find(r => r.type === 'exit');
 
       if (yPosition > 650) {
@@ -980,46 +986,74 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, requireAdm
         yPosition = 50;
         
         // Cabeçalho na nova página
-        doc.fontSize(9).font('Helvetica-Bold');
+        doc.fontSize(8).font('Helvetica-Bold');
         doc.text('DATA', 50, yPosition);
-        doc.text('DIA', 50 + colWidth, yPosition);
-        doc.text('ENTRADA', 50 + colWidth * 2, yPosition);
-        doc.text('SAÍDA', 50 + colWidth * 3, yPosition);
-        doc.text('TOTAL', 50 + colWidth * 4, yPosition);
-        doc.text('H. EXTRA', 50 + colWidth * 5, yPosition);
+        doc.text('DIA', 50 + colWidthNew, yPosition);
+        doc.text('ENTRADA', 50 + colWidthNew * 2, yPosition);
+        doc.text('PAUSA', 50 + colWidthNew * 3, yPosition);
+        doc.text('RETORNO', 50 + colWidthNew * 4, yPosition);
+        doc.text('SAÍDA', 50 + colWidthNew * 5, yPosition);
+        doc.text('TOTAL', 50 + colWidthNew * 6, yPosition);
+        doc.text('H. EXTRA', 50 + colWidthNew * 7, yPosition);
         
         yPosition += 15;
-        doc.moveTo(50, yPosition).lineTo(50 + pageWidth, yPosition).stroke();
+        doc.moveTo(50, yPosition).lineTo(50 + pageWidthNew, yPosition).stroke();
         yPosition += 10;
-        doc.fontSize(8).font('Helvetica');
+        doc.fontSize(7).font('Helvetica');
       }
 
       // Data
       doc.text(date.toLocaleDateString('pt-BR'), 50, yPosition);
       
       // Dia da semana
-      doc.text(dayName.charAt(0).toUpperCase() + dayName.slice(1), 50 + colWidth, yPosition);
+      const dayShort = dayName.substring(0, 3);
+      doc.text(dayShort.charAt(0).toUpperCase() + dayShort.slice(1), 50 + colWidthNew, yPosition);
       
-      // Entrada
-      if (entrada) {
-        doc.text(new Date(entrada.timestamp).toLocaleTimeString('pt-BR'), 50 + colWidth * 2, yPosition);
+      // Primeira entrada
+      const primeiraEntrada = entradas[0];
+      if (primeiraEntrada) {
+        doc.text(new Date(primeiraEntrada.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}), 50 + colWidthNew * 2, yPosition);
       } else {
-        doc.text('--:--', 50 + colWidth * 2, yPosition);
+        doc.text('--:--', 50 + colWidthNew * 2, yPosition);
+      }
+      
+      // Pausa
+      const pausa = pausas[0];
+      if (pausa) {
+        doc.text(new Date(pausa.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}), 50 + colWidthNew * 3, yPosition);
+      } else {
+        doc.text('--:--', 50 + colWidthNew * 3, yPosition);
+      }
+      
+      // Retorno (segunda entrada)
+      const retorno = entradas[1];
+      if (retorno) {
+        doc.text(new Date(retorno.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}), 50 + colWidthNew * 4, yPosition);
+      } else {
+        doc.text('--:--', 50 + colWidthNew * 4, yPosition);
       }
       
       // Saída
       if (saida) {
-        doc.text(new Date(saida.timestamp).toLocaleTimeString('pt-BR'), 50 + colWidth * 3, yPosition);
+        doc.text(new Date(saida.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}), 50 + colWidthNew * 5, yPosition);
       } else {
-        doc.text('--:--', 50 + colWidth * 3, yPosition);
+        doc.text('--:--', 50 + colWidthNew * 5, yPosition);
       }
       
-      // Cálculo de horas
+      // Cálculo de horas trabalhadas: (saída - primeira entrada) - (retorno - pausa)
       let horasTrabalhadas = '--:--';
       let horasExtras = '--:--';
       
-      if (entrada && saida) {
-        const diffMs = new Date(saida.timestamp) - new Date(entrada.timestamp);
+      if (primeiraEntrada && saida) {
+        // Tempo total (saída - primeira entrada)
+        let diffMs = new Date(saida.timestamp) - new Date(primeiraEntrada.timestamp);
+        
+        // Subtrair tempo de pausa se houver pausa e retorno
+        if (pausa && retorno) {
+          const pausaMs = new Date(retorno.timestamp) - new Date(pausa.timestamp);
+          diffMs -= pausaMs;
+        }
+        
         const diffHours = diffMs / (1000 * 60 * 60);
         
         const horas = Math.floor(diffHours);
@@ -1040,8 +1074,8 @@ app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, requireAdm
         totalHorasNormais += Math.min(diffHours, 8);
       }
       
-      doc.text(horasTrabalhadas, 50 + colWidth * 4, yPosition);
-      doc.text(horasExtras, 50 + colWidth * 5, yPosition);
+      doc.text(horasTrabalhadas, 50 + colWidthNew * 6, yPosition);
+      doc.text(horasExtras, 50 + colWidthNew * 7, yPosition);
       
       yPosition += 12;
     });
@@ -1117,11 +1151,24 @@ app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (re
 
         Object.keys(recordsByDay).forEach(dateKey => {
           const dayRecords = recordsByDay[dateKey];
-          const entrada = dayRecords.find(r => r.type === 'entry');
+          const entradas = dayRecords.filter(r => r.type === 'entry');
+          const pausas = dayRecords.filter(r => r.type === 'pause');
           const saida = dayRecords.find(r => r.type === 'exit');
 
-          if (entrada && saida) {
-            const diffMs = new Date(saida.timestamp) - new Date(entrada.timestamp);
+          const primeiraEntrada = entradas[0];
+          const retorno = entradas[1];
+          const pausa = pausas[0];
+
+          if (primeiraEntrada && saida) {
+            // Tempo total (saída - primeira entrada)
+            let diffMs = new Date(saida.timestamp) - new Date(primeiraEntrada.timestamp);
+            
+            // Subtrair tempo de pausa se houver pausa e retorno
+            if (pausa && retorno) {
+              const pausaMs = new Date(retorno.timestamp) - new Date(pausa.timestamp);
+              diffMs -= pausaMs;
+            }
+            
             const diffHours = diffMs / (1000 * 60 * 60);
             
             totalHorasNormais += Math.min(diffHours, 8);
@@ -1173,8 +1220,20 @@ app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (re
       { header: 'Hora Extra', key: 'salario_extra', width: 15 },
       { header: 'Salário Total', key: 'salario_total', width: 15 }
     ];
+    
+    // Planilha detalhada de registros com pausas
+    const detailedSheet = workbook.addWorksheet('Registros Detalhados');
+    detailedSheet.columns = [
+      { header: 'Funcionário', key: 'nome', width: 25 },
+      { header: 'Data', key: 'data', width: 12 },
+      { header: 'Entrada', key: 'entrada', width: 10 },
+      { header: 'Pausa', key: 'pausa', width: 10 },
+      { header: 'Retorno', key: 'retorno', width: 10 },
+      { header: 'Saída', key: 'saida', width: 10 },
+      { header: 'Total Horas', key: 'total_horas', width: 12 }
+    ];
 
-    // Adicionar dados
+    // Adicionar dados na planilha principal
     payrollData.forEach(emp => {
       worksheet.addRow({
         nome: emp.nome,
@@ -1187,9 +1246,66 @@ app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (re
         salario_extra: Math.round(emp.salario_extra * 100) / 100,
         salario_total: Math.round(emp.salario_total * 100) / 100
       });
+      
+      // Adicionar registros detalhados do funcionário
+      const recordsByDay = {};
+      emp.registros.forEach(record => {
+        const dateKey = new Date(record.timestamp).toISOString().split('T')[0];
+        if (!recordsByDay[dateKey]) {
+          recordsByDay[dateKey] = [];
+        }
+        recordsByDay[dateKey].push(record);
+      });
+
+      Object.keys(recordsByDay).sort().forEach(dateKey => {
+        const dayRecords = recordsByDay[dateKey];
+        const entradas = dayRecords.filter(r => r.type === 'entry');
+        const pausas = dayRecords.filter(r => r.type === 'pause');
+        const saida = dayRecords.find(r => r.type === 'exit');
+
+        const primeiraEntrada = entradas[0];
+        const retorno = entradas[1];
+        const pausa = pausas[0];
+
+        let totalHoras = '--:--';
+        if (primeiraEntrada && saida) {
+          let diffMs = new Date(saida.timestamp) - new Date(primeiraEntrada.timestamp);
+          
+          if (pausa && retorno) {
+            const pausaMs = new Date(retorno.timestamp) - new Date(pausa.timestamp);
+            diffMs -= pausaMs;
+          }
+          
+          const diffHours = diffMs / (1000 * 60 * 60);
+          const horas = Math.floor(diffHours);
+          const minutos = Math.floor((diffHours - horas) * 60);
+          totalHoras = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+        }
+
+        detailedSheet.addRow({
+          nome: emp.nome,
+          data: new Date(dateKey),
+          entrada: primeiraEntrada ? new Date(primeiraEntrada.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : '--:--',
+          pausa: pausa ? new Date(pausa.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : '--:--',
+          retorno: retorno ? new Date(retorno.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : '--:--',
+          saida: saida ? new Date(saida.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : '--:--',
+          total_horas: totalHoras
+        });
+      });
     });
 
-    // Formatar números
+    // Formatar a planilha detalhada
+    const detailedHeaderRow = detailedSheet.getRow(1);
+    detailedHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    detailedHeaderRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF2E86AB' }
+    };
+    detailedHeaderRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    detailedSheet.getColumn(2).numFmt = 'dd/mm/yyyy';
+
+    // Formatar números na planilha principal
     [5, 6, 7, 8].forEach(colIndex => {
       worksheet.getColumn(colIndex).numFmt = '"R$"#,##0.00';
     });

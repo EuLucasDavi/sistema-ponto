@@ -25,6 +25,7 @@ const EmployeeDashboard = () => {
   const [registerLoading, setRegisterLoading] = useState(false);
   const [lastRecord, setLastRecord] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [lastRecordType, setLastRecordType] = useState(null);
 
   useEffect(() => {
     fetchEmployeeData();
@@ -69,6 +70,15 @@ const EmployeeDashboard = () => {
         }
       });
       setRecentRecords(response.data);
+      
+      // Buscar último registro de hoje
+      const todayStr = today.toISOString().split('T')[0];
+      const todayRecords = response.data.filter(r => 
+        r.timestamp.startsWith(todayStr)
+      );
+      if (todayRecords.length > 0) {
+        setLastRecordType(todayRecords[todayRecords.length - 1].type);
+      }
     } catch (error) {
       console.error('Erro ao buscar registros:', error);
     }
@@ -91,6 +101,7 @@ const EmployeeDashboard = () => {
         timestamp: new Date().toLocaleString('pt-BR'),
         employee: employeeData?.name
       });
+      setLastRecordType(type);
       
     } catch (error) {
       console.error('Erro ao registrar ponto:', error);
@@ -177,59 +188,65 @@ const EmployeeDashboard = () => {
               </div>
 
               <div className="time-buttons">
-                <button 
-                  className="btn btn-success btn-large"
-                  onClick={() => registerTime('entry')}
-                  disabled={registerLoading}
-                >
-                  {registerLoading ? (
-                    <>
-                      <div className="loading-spinner"></div>
-                      <span>Registrando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FiLogIn size={20} />
-                      <span>Registrar Entrada</span>
-                    </>
-                  )}
-                </button>
+                {(!lastRecordType || lastRecordType === 'exit') && (
+                  <button 
+                    className="btn btn-success btn-large"
+                    onClick={() => registerTime('entry')}
+                    disabled={registerLoading}
+                  >
+                    {registerLoading ? (
+                      <>
+                        <div className="loading-spinner"></div>
+                        <span>Registrando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiLogIn size={20} />
+                        <span>Registrar Entrada</span>
+                      </>
+                    )}
+                  </button>
+                )}
                 
-                <button 
-                  className="btn btn-warning btn-large"
-                  onClick={() => registerTime('pause')}
-                  disabled={registerLoading}
-                >
-                  {registerLoading ? (
-                    <>
-                      <div className="loading-spinner"></div>
-                      <span>Registrando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FiPauseCircle size={20} />
-                      <span>Registrar Pausa</span>
-                    </>
-                  )}
-                </button>
-                
-                <button 
-                  className="btn btn-danger btn-large"
-                  onClick={() => registerTime('exit')}
-                  disabled={registerLoading}
-                >
-                  {registerLoading ? (
-                    <>
-                      <div className="loading-spinner"></div>
-                      <span>Registrando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FiLogOut size={20} />
-                      <span>Registrar Saída</span>
-                    </>
-                  )}
-                </button>
+                {lastRecordType === 'entry' && (
+                  <button 
+                    className="btn btn-warning btn-large"
+                    onClick={() => registerTime('pause')}
+                    disabled={registerLoading}
+                  >
+                    {registerLoading ? (
+                      <>
+                        <div className="loading-spinner"></div>
+                        <span>Registrando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiPauseCircle size={20} />
+                        <span>Registrar Pausa</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {(lastRecordType === 'entry' || lastRecordType === 'pause') && (
+                  <button 
+                    className={lastRecordType === 'pause' ? 'btn btn-success btn-large' : 'btn btn-danger btn-large'}
+                    onClick={() => registerTime(lastRecordType === 'pause' ? 'entry' : 'exit')}
+                    disabled={registerLoading}
+                  >
+                    {registerLoading ? (
+                      <>
+                        <div className="loading-spinner"></div>
+                        <span>Registrando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiLogOut size={20} />
+                        <span>{lastRecordType === 'pause' ? 'Registrar Retorno' : 'Registrar Saída'}</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
 
               {lastRecord && (
