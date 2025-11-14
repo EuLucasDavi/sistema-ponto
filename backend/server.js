@@ -7,6 +7,9 @@ import { MongoClient, ObjectId } from 'mongodb';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 
+// CONFIGURAR FUSO HORÁRIO DO BRASIL
+process.env.TZ = 'America/Sao_Paulo';
+
 // Configurar dotenv primeiro
 dotenv.config();
 
