@@ -12,7 +12,8 @@ import {
   FiInfo,
   FiArrowRight,
   FiHome,
-  FiTrendingUp
+  FiTrendingUp,
+  FiPauseCircle
 } from 'react-icons/fi';
 
 const EmployeeDashboard = () => {
@@ -193,6 +194,25 @@ const EmployeeDashboard = () => {
                     </>
                   )}
                 </button>
+                
+                <button 
+                  className="btn btn-warning btn-large"
+                  onClick={() => registerTime('pause')}
+                  disabled={registerLoading}
+                >
+                  {registerLoading ? (
+                    <>
+                      <div className="loading-spinner"></div>
+                      <span>Registrando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FiPauseCircle size={20} />
+                      <span>Registrar Pausa</span>
+                    </>
+                  )}
+                </button>
+                
                 <button 
                   className="btn btn-danger btn-large"
                   onClick={() => registerTime('exit')}
@@ -223,7 +243,8 @@ const EmployeeDashboard = () => {
                       <div>
                         <strong>Tipo</strong>
                         <span className={`record-type ${lastRecord.type}`}>
-                          {lastRecord.type === 'entry' ? 'Entrada' : 'Saída'}
+                          {lastRecord.type === 'entry' ? 'Entrada' : 
+                           lastRecord.type === 'pause' ? 'Pausa' : 'Saída'}
                         </span>
                       </div>
                     </div>
@@ -283,7 +304,8 @@ const EmployeeDashboard = () => {
                           </strong>
                         </div>
                         <span className={`record-type ${record.type}`}>
-                          {record.type === 'entry' ? 'ENTRADA' : 'SAÍDA'}
+                          {record.type === 'entry' ? 'ENTRADA' : 
+                           record.type === 'pause' ? 'PAUSA' : 'SAÍDA'}
                         </span>
                       </div>
                     </div>

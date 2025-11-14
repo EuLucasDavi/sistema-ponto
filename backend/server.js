@@ -567,6 +567,52 @@ app.post('/api/time-records', authenticateToken, requireAdmin, async (req, res) 
   const timestamp = new Date();
 
   try {
+    // Validar o tipo de registro
+    if (!['entry', 'pause', 'exit'].includes(type)) {
+      return res.status(400).json({ error: 'Tipo de registro inválido. Use: entry, pause ou exit' });
+    }
+
+    // Buscar o último registro do funcionário hoje
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const lastRecord = await db.collection('time_records')
+      .findOne({
+        employee_id: new ObjectId(employee_id),
+        timestamp: { $gte: today }
+      }, {
+        sort: { timestamp: -1 }
+      });
+
+    // Validar regras de negócio
+    if (type === 'entry') {
+      // Não pode dar entrada se já houver uma entrada sem saída
+      if (lastRecord && lastRecord.type === 'entry') {
+        return res.status(400).json({ 
+          error: 'Você já registrou uma entrada. Registre pausa ou saída primeiro.' 
+        });
+      }
+      if (lastRecord && lastRecord.type === 'pause') {
+        return res.status(400).json({ 
+          error: 'Você está em pausa. Registre saída primeiro antes de uma nova entrada.' 
+        });
+      }
+    } else if (type === 'pause') {
+      // Só pode dar pausa se houver entrada sem saída
+      if (!lastRecord || lastRecord.type !== 'entry') {
+        return res.status(400).json({ 
+          error: 'Você precisa registrar uma entrada antes de pausar.' 
+        });
+      }
+    } else if (type === 'exit') {
+      // Só pode dar saída se houver entrada (e não pode ter saída já registrada)
+      if (!lastRecord || (lastRecord.type !== 'entry' && lastRecord.type !== 'pause')) {
+        return res.status(400).json({ 
+          error: 'Você precisa registrar uma entrada antes de sair.' 
+        });
+      }
+    }
+
     const result = await db.collection('time_records').insertOne({
       employee_id: new ObjectId(employee_id),
       type,
@@ -682,6 +728,52 @@ app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req,
 
     if (!user || !user.employee_id) {
       return res.status(400).json({ error: 'Funcionário não vinculado' });
+    }
+
+    // Validar o tipo de registro
+    if (!['entry', 'pause', 'exit'].includes(type)) {
+      return res.status(400).json({ error: 'Tipo de registro inválido. Use: entry, pause ou exit' });
+    }
+
+    // Buscar o último registro do funcionário hoje
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const lastRecord = await db.collection('time_records')
+      .findOne({
+        employee_id: user.employee_id,
+        timestamp: { $gte: today }
+      }, {
+        sort: { timestamp: -1 }
+      });
+
+    // Validar regras de negócio
+    if (type === 'entry') {
+      // Não pode dar entrada se já houver uma entrada sem saída
+      if (lastRecord && lastRecord.type === 'entry') {
+        return res.status(400).json({ 
+          error: 'Você já registrou uma entrada. Registre pausa ou saída primeiro.' 
+        });
+      }
+      if (lastRecord && lastRecord.type === 'pause') {
+        return res.status(400).json({ 
+          error: 'Você está em pausa. Registre saída primeiro antes de uma nova entrada.' 
+        });
+      }
+    } else if (type === 'pause') {
+      // Só pode dar pausa se houver entrada sem saída
+      if (!lastRecord || lastRecord.type !== 'entry') {
+        return res.status(400).json({ 
+          error: 'Você precisa registrar uma entrada antes de pausar.' 
+        });
+      }
+    } else if (type === 'exit') {
+      // Só pode dar saída se houver entrada (e não pode ter saída já registrada)
+      if (!lastRecord || (lastRecord.type !== 'entry' && lastRecord.type !== 'pause')) {
+        return res.status(400).json({ 
+          error: 'Você precisa registrar uma entrada antes de sair.' 
+        });
+      }
     }
 
     const result = await db.collection('time_records').insertOne({

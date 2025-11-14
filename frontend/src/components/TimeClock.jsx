@@ -10,7 +10,8 @@ import {
   FiInfo,
   FiUsers,
   FiCalendar,
-  FiWatch
+  FiWatch,
+  FiPauseCircle
 } from 'react-icons/fi';
 
 const TimeClock = () => {
@@ -157,6 +158,24 @@ const TimeClock = () => {
             </button>
             
             <button 
+              className="btn btn-warning btn-large"
+              onClick={() => registerTime('pause')}
+              disabled={loading || !selectedEmployee}
+            >
+              {loading ? (
+                <>
+                  <div className="loading-spinner"></div>
+                  <span>Registrando...</span>
+                </>
+              ) : (
+                <>
+                  <FiPauseCircle size={20} />
+                  <span>Registrar Pausa</span>
+                </>
+              )}
+            </button>
+            
+            <button 
               className="btn btn-danger btn-large"
               onClick={() => registerTime('exit')}
               disabled={loading || !selectedEmployee}
@@ -192,13 +211,16 @@ const TimeClock = () => {
                 <div className="record-item">
                   {lastRecord.type === 'entry' ? (
                     <FiLogIn size={16} color="#28a745" />
+                  ) : lastRecord.type === 'pause' ? (
+                    <FiPauseCircle size={16} color="#ffc107" />
                   ) : (
                     <FiLogOut size={16} color="#dc3545" />
                   )}
                   <div>
                     <strong>Tipo:</strong>
                     <span className={`record-type ${lastRecord.type}`}>
-                      {lastRecord.type === 'entry' ? 'Entrada' : 'Saída'}
+                      {lastRecord.type === 'entry' ? 'ENTRADA' : 
+                       lastRecord.type === 'pause' ? 'PAUSA' : 'SAÍDA'}
                     </span>
                   </div>
                 </div>
@@ -228,7 +250,11 @@ const TimeClock = () => {
                 Clique em "Registrar Entrada" ao chegar
               </li>
               <li>
-                <FiCheckCircle size={16} color="#28a745" />
+                <FiCheckCircle size={16} color="#ffc107" />
+                Clique em "Registrar Pausa" para intervalos (almoço)
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#dc3545" />
                 Clique em "Registrar Saída" ao sair
               </li>
               <li>
