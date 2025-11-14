@@ -46,7 +46,7 @@ const Login = () => {
           <div className="login-logo">
             <FiBriefcase size={40} className="logo-icon" />
             <div className="logo-text">
-              <h1>Sistema Ponto</h1>
+              <h1>Ponto Max</h1>
               <span>Controle de Ponto Eletrônico</span>
             </div>
           </div>
