@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   FiMenu, FiX, FiLogOut, FiBarChart2, FiUsers,
   FiUser, FiClock, FiBriefcase,
-  FiHome
+  FiHome,FiFileText
 } from 'react-icons/fi';
 
 const Layout = ({ children }) => {
