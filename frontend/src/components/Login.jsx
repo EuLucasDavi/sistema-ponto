@@ -26,13 +26,13 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     clearError();
-    
+
     if (!username || !password) {
       return;
     }
 
     const result = await login(username, password);
-    
+
     if (result.success) {
       navigate('/');
     }
@@ -46,7 +46,7 @@ const Login = () => {
           <div className="login-logo">
             <FiBriefcase size={40} className="logo-icon" />
             <div className="logo-text">
-              <h1>Sistema Ponto</h1>
+              <h1>Ponto Max</h1>
               <span>Controle de Ponto Eletrônico</span>
             </div>
           </div>
@@ -94,8 +94,8 @@ const Login = () => {
             />
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="btn btn-primary login-btn"
             disabled={loading || !username || !password}
           >
@@ -127,6 +127,31 @@ const Login = () => {
             <div className="feature-item">
               <FiBriefcase size={16} />
               <span>Relatórios profissionais</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Banner lateral para desktop */}
+      <div className="login-banner">
+        <div className="banner-content">
+          <div className="banner-icon">
+            <FiBriefcase size={48} />
+          </div>
+          <h2>Sistema de Ponto Eletrônico</h2>
+          <p>Controle completo de jornada de trabalho com relatórios detalhados e gestão eficiente.</p>
+          <div className="banner-features">
+            <div className="banner-feature">
+              <FiCheckCircle size={20} />
+              <span>Registro em tempo real</span>
+            </div>
+            <div className="banner-feature">
+              <FiCheckCircle size={20} />
+              <span>Relatórios automáticos</span>
+            </div>
+            <div className="banner-feature">
+              <FiCheckCircle size={20} />
+              <span>Controle de horas extras</span>
             </div>
           </div>
         </div>
