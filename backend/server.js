@@ -48,8 +48,11 @@ const connectToMongoDB = async () => {
     await db.collection('users').createIndex({ username: 1 }, { unique: true });
     await db.collection('employees').createIndex({ email: 1 }, { unique: true });
     await db.collection('time_records').createIndex({ employee_id: 1, timestamp: 1 });
+    await db.collection('pause_reasons').createIndex({ name: 1 }, { unique: true }); // NOVO
+    await db.collection('requests').createIndex({ employee_id: 1, created_at: -1 }); // NOVO
+    await db.collection('requests').createIndex({ status: 1 }); // NOVO
     
-    // Criar usuário admin padrão
+    // Criar usuário admin padrão e justificativas
     await createDefaultAdmin();
   } catch (error) {
     console.error('❌ Erro ao conectar com MongoDB:', error.message);
@@ -72,6 +75,9 @@ const createDefaultAdmin = async () => {
     } else {
       console.log('👤 Usuário admin já existe');
     }
+
+    // Criar justificativas padrão
+    await createDefaultPauseReasons();
   } catch (error) {
     console.error('❌ Erro ao criar admin:', error);
   }
@@ -565,180 +571,208 @@ app.delete('/api/employees/:id', authenticateToken, requireAdmin, async (req, re
 });
 
 // ==================== ROTAS DE REGISTRO DE PONTO (ADMIN) ====================
-app.post('/api/time-records', authenticateToken, requireAdmin, async (req, res) => {
-  const { employee_id, type } = req.body;
-  const timestamp = new Date();
+// app.post('/api/time-records', authenticateToken, requireAdmin, async (req, res) => {
+//   const { employee_id, type } = req.body;
+//   const timestamp = new Date();
 
-  try {
-    // Validar o tipo de registro
-    if (!['entry', 'pause', 'exit'].includes(type)) {
-      return res.status(400).json({ error: 'Tipo de registro inválido. Use: entry, pause ou exit' });
-    }
+//   try {
+//     // Validar o tipo de registro
+//     if (!['entry', 'pause', 'exit'].includes(type)) {
+//       return res.status(400).json({ error: 'Tipo de registro inválido. Use: entry, pause ou exit' });
+//     }
 
-    // Buscar o último registro do funcionário hoje
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+//     // Buscar o último registro do funcionário hoje
+//     const today = new Date();
+//     today.setHours(0, 0, 0, 0);
     
-    const lastRecord = await db.collection('time_records')
-      .findOne({
-        employee_id: new ObjectId(employee_id),
-        timestamp: { $gte: today }
-      }, {
-        sort: { timestamp: -1 }
-      });
+//     const lastRecord = await db.collection('time_records')
+//       .findOne({
+//         employee_id: new ObjectId(employee_id),
+//         timestamp: { $gte: today }
+//       }, {
+//         sort: { timestamp: -1 }
+//       });
 
-    if (type === 'entry') {
-      if (lastRecord && lastRecord.type === 'entry') {
-        return res.status(400).json({ 
-          error: 'Entrada já registrada. Registre pausa ou saída primeiro.' 
-        });
-      }
-      // Permite entrada após saída (novo turno no mesmo dia)
-    } 
-    else if (type === 'pause') {
-      // Só pode pausar se a última ação foi entrada
-      if (!lastRecord || lastRecord.type !== 'entry') {
-        return res.status(400).json({ 
-          error: 'Você precisa registrar uma entrada antes de pausar.' 
-        });
-      }
-    } 
-    else if (type === 'exit') {
-      // Pode sair se:
-      // - Último registro foi entrada (expediente sem pausa)
-      // - Último registro foi pausa (saída direta após pausa)
-      // - Último registro foi entrada após retorno (expediente com pausa)
-      if (!lastRecord) {
-        return res.status(400).json({ 
-          error: 'Registro de entrada não encontrado para hoje.' 
-        });
-      }
-      if (lastRecord.type === 'exit') {
-        return res.status(400).json({ 
-          error: 'Saída já registrada para hoje.' 
+//     if (type === 'entry') {
+//       if (lastRecord && lastRecord.type === 'entry') {
+//         return res.status(400).json({ 
+//           error: 'Entrada já registrada. Registre pausa ou saída primeiro.' 
+//         });
+//       }
+//       // Permite entrada após saída (novo turno no mesmo dia)
+//     } 
+//     else if (type === 'pause') {
+//       // Só pode pausar se a última ação foi entrada
+//       if (!lastRecord || lastRecord.type !== 'entry') {
+//         return res.status(400).json({ 
+//           error: 'Você precisa registrar uma entrada antes de pausar.' 
+//         });
+//       }
+//     } 
+//     else if (type === 'exit') {
+//       // Pode sair se:
+//       // - Último registro foi entrada (expediente sem pausa)
+//       // - Último registro foi pausa (saída direta após pausa)
+//       // - Último registro foi entrada após retorno (expediente com pausa)
+//       if (!lastRecord) {
+//         return res.status(400).json({ 
+//           error: 'Registro de entrada não encontrado para hoje.' 
+//         });
+//       }
+//       if (lastRecord.type === 'exit') {
+//         return res.status(400).json({ 
+//           error: 'Saída já registrada para hoje.' 
+//         });
+//       }
+//     }
+
+//     const result = await db.collection('time_records').insertOne({
+//       employee_id: new ObjectId(employee_id),
+//       type,
+//       timestamp,
+//       created_at: new Date()
+//     });
+
+//     const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
+//     res.status(201).json(newRecord);
+//   } catch (error) {
+//     res.status(500).json({ error: error.message });
+//   }
+// });
+
+// app.get('/api/time-records/:employee_id', authenticateToken, requireAdmin, async (req, res) => {
+//   const { employee_id } = req.params;
+//   const { start_date, end_date } = req.query;
+
+//   try {
+//     const records = await db.collection('time_records')
+//       .find({
+//         employee_id: new ObjectId(employee_id),
+//         timestamp: {
+//           $gte: new Date(start_date),
+//           $lte: new Date(end_date + 'T23:59:59.999Z')
+//         }
+//       })
+//       .sort({ timestamp: -1 })
+//       .toArray();
+
+//     res.json(records);
+//   } catch (error) {
+//     res.status(500).json({ error: error.message });
+//   }
+// });
+
+// Função para criar justificativas padrão
+const createDefaultPauseReasons = async () => {
+  try {
+    const defaultReasons = [
+      { name: 'Almoço', description: 'Pausa para refeição' },
+      { name: 'Café', description: 'Pausa para café/descanso' },
+      { name: 'Assunto Pessoal', description: 'Assuntos pessoais urgentes' },
+      { name: 'Assunto Corporativo', description: 'Assuntos internos da empresa' },
+      { name: 'Reunião', description: 'Participação em reunião' },
+      { name: 'Médico', description: 'Consulta médica' }
+    ];
+
+    for (const reason of defaultReasons) {
+      const exists = await db.collection('pause_reasons').findOne({ name: reason.name });
+      if (!exists) {
+        await db.collection('pause_reasons').insertOne({
+          ...reason,
+          created_at: new Date()
         });
       }
     }
-
-    const result = await db.collection('time_records').insertOne({
-      employee_id: new ObjectId(employee_id),
-      type,
-      timestamp,
-      created_at: new Date()
-    });
-
-    const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
-    res.status(201).json(newRecord);
+    
+    console.log('✅ Justificativas de pausa padrão criadas');
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('❌ Erro ao criar justificativas padrão:', error);
   }
-});
-
-app.get('/api/time-records/:employee_id', authenticateToken, requireAdmin, async (req, res) => {
-  const { employee_id } = req.params;
-  const { start_date, end_date } = req.query;
-
-  try {
-    const records = await db.collection('time_records')
-      .find({
-        employee_id: new ObjectId(employee_id),
-        timestamp: {
-          $gte: new Date(start_date),
-          $lte: new Date(end_date + 'T23:59:59.999Z')
-        }
-      })
-      .sort({ timestamp: -1 })
-      .toArray();
-
-    res.json(records);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+};
 
 // ==================== ROTAS PESSOAIS DO FUNCIONÁRIO ====================
 
 // Funcionário ver seus próprios dados
-app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
-  const { type } = req.body;
-  const timestamp = new Date();
+// app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
+//   const { type } = req.body;
+//   const timestamp = new Date();
 
-  try {
-    const user = await db.collection('users').findOne({ 
-      _id: new ObjectId(req.user.id) 
-    });
+//   try {
+//     const user = await db.collection('users').findOne({ 
+//       _id: new ObjectId(req.user.id) 
+//     });
 
-    if (!user || !user.employee_id) {
-      return res.status(400).json({ error: 'Funcionário não vinculado' });
-    }
+//     if (!user || !user.employee_id) {
+//       return res.status(400).json({ error: 'Funcionário não vinculado' });
+//     }
 
-    // Validar o tipo de registro
-    if (!['entry', 'pause', 'exit'].includes(type)) {
-      return res.status(400).json({ error: 'Tipo de registro inválido. Use: entry, pause ou exit' });
-    }
+//     // Validar o tipo de registro
+//     if (!['entry', 'pause', 'exit'].includes(type)) {
+//       return res.status(400).json({ error: 'Tipo de registro inválido. Use: entry, pause ou exit' });
+//     }
 
-    // Buscar o último registro do funcionário hoje
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+//     // Buscar o último registro do funcionário hoje
+//     const today = new Date();
+//     today.setHours(0, 0, 0, 0);
     
-    const lastRecord = await db.collection('time_records')
-      .findOne({
-        employee_id: user.employee_id,
-        timestamp: { $gte: today }
-      }, {
-        sort: { timestamp: -1 }
-      });
+//     const lastRecord = await db.collection('time_records')
+//       .findOne({
+//         employee_id: user.employee_id,
+//         timestamp: { $gte: today }
+//       }, {
+//         sort: { timestamp: -1 }
+//       });
 
-    // MESMA LÓGICA CORRIGIDA APLICADA AQUI
-    if (type === 'entry') {
-      if (lastRecord && lastRecord.type === 'entry') {
-        return res.status(400).json({ 
-          error: 'Entrada já registrada. Registre pausa ou saída primeiro.' 
-        });
-      }
-    } 
-    else if (type === 'pause') {
-      if (!lastRecord || lastRecord.type !== 'entry') {
-        return res.status(400).json({ 
-          error: 'Você precisa registrar uma entrada antes de pausar.' 
-        });
-      }
-    } 
-    else if (type === 'exit') {
-      if (!lastRecord) {
-        return res.status(400).json({ 
-          error: 'Registro de entrada não encontrado para hoje.' 
-        });
-      }
-      if (lastRecord.type === 'exit') {
-        return res.status(400).json({ 
-          error: 'Saída já registrada para hoje.' 
-        });
-      }
-    }
+//     // MESMA LÓGICA CORRIGIDA APLICADA AQUI
+//     if (type === 'entry') {
+//       if (lastRecord && lastRecord.type === 'entry') {
+//         return res.status(400).json({ 
+//           error: 'Entrada já registrada. Registre pausa ou saída primeiro.' 
+//         });
+//       }
+//     } 
+//     else if (type === 'pause') {
+//       if (!lastRecord || lastRecord.type !== 'entry') {
+//         return res.status(400).json({ 
+//           error: 'Você precisa registrar uma entrada antes de pausar.' 
+//         });
+//       }
+//     } 
+//     else if (type === 'exit') {
+//       if (!lastRecord) {
+//         return res.status(400).json({ 
+//           error: 'Registro de entrada não encontrado para hoje.' 
+//         });
+//       }
+//       if (lastRecord.type === 'exit') {
+//         return res.status(400).json({ 
+//           error: 'Saída já registrada para hoje.' 
+//         });
+//       }
+//     }
 
-    const result = await db.collection('time_records').insertOne({
-      employee_id: user.employee_id,
-      type,
-      timestamp,
-      created_at: new Date()
-    });
+//     const result = await db.collection('time_records').insertOne({
+//       employee_id: user.employee_id,
+//       type,
+//       timestamp,
+//       created_at: new Date()
+//     });
 
-    const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
+//     const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
     
-    // Buscar dados do funcionário para a resposta
-    const employee = await db.collection('employees').findOne({ 
-      _id: user.employee_id 
-    });
+//     // Buscar dados do funcionário para a resposta
+//     const employee = await db.collection('employees').findOne({ 
+//       _id: user.employee_id 
+//     });
 
-    res.status(201).json({
-      ...newRecord,
-      employee_name: employee?.name
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+//     res.status(201).json({
+//       ...newRecord,
+//       employee_name: employee?.name
+//     });
+//   } catch (error) {
+//     res.status(500).json({ error: error.message });
+//   }
+// });
 
 // Funcionário ver seus próprios registros de ponto
 app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
@@ -1497,6 +1531,352 @@ app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (re
   } catch (error) {
     console.error('❌ Erro ao gerar Excel:', error);
     res.status(500).json({ error: 'Erro ao gerar Excel: ' + error.message });
+  }
+});
+
+// Coleção de tipos de justificativa de pausa
+app.get('/api/pause-reasons', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const reasons = await db.collection('pause_reasons')
+      .find()
+      .sort({ name: 1 })
+      .toArray();
+    res.json(reasons);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/pause-reasons', authenticateToken, requireAdmin, async (req, res) => {
+  const { name, description } = req.body;
+
+  try {
+    const result = await db.collection('pause_reasons').insertOne({
+      name,
+      description,
+      created_at: new Date()
+    });
+
+    const newReason = await db.collection('pause_reasons').findOne({ _id: result.insertedId });
+    res.status(201).json(newReason);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/pause-reasons/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await db.collection('pause_reasons').deleteOne({ _id: new ObjectId(id) });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Justificativa não encontrada' });
+    }
+
+    res.json({ message: 'Justificativa excluída com sucesso' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== SOLICITAÇÕES ====================
+
+// Tipos de solicitação
+const REQUEST_TYPES = {
+  ABSENCE: 'absence',
+  TIME_RECORD: 'time_record'
+};
+
+// Status das solicitações
+const REQUEST_STATUS = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected'
+};
+
+// Criar solicitação
+app.post('/api/requests', authenticateToken, async (req, res) => {
+  const { type, date, reason, description, requested_time } = req.body;
+
+  try {
+    const user = await db.collection('users').findOne({ 
+      _id: new ObjectId(req.user.id) 
+    });
+
+    if (!user || !user.employee_id) {
+      return res.status(400).json({ error: 'Funcionário não vinculado' });
+    }
+
+    // Validar tipo de solicitação
+    if (![REQUEST_TYPES.ABSENCE, REQUEST_TYPES.TIME_RECORD].includes(type)) {
+      return res.status(400).json({ error: 'Tipo de solicitação inválido' });
+    }
+
+    // Para solicitação de ponto, horário é obrigatório
+    if (type === REQUEST_TYPES.TIME_RECORD && !requested_time) {
+      return res.status(400).json({ error: 'Horário é obrigatório para solicitação de ponto' });
+    }
+
+    const result = await db.collection('requests').insertOne({
+      employee_id: user.employee_id,
+      user_id: new ObjectId(req.user.id),
+      type,
+      date: new Date(date),
+      reason,
+      description,
+      requested_time: requested_time ? new Date(`${date}T${requested_time}`) : null,
+      status: REQUEST_STATUS.PENDING,
+      created_at: new Date(),
+      updated_at: new Date()
+    });
+
+    const newRequest = await db.collection('requests').findOne({ _id: result.insertedId });
+    
+    // Buscar dados do funcionário
+    const employee = await db.collection('employees').findOne({ 
+      _id: user.employee_id 
+    });
+
+    res.status(201).json({
+      ...newRequest,
+      employee_name: employee?.name
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Listar solicitações (admin vê todas, funcionário vê apenas as próprias)
+app.get('/api/requests', authenticateToken, async (req, res) => {
+  try {
+    let query = {};
+    
+    if (req.user.role !== 'admin') {
+      const user = await db.collection('users').findOne({ 
+        _id: new ObjectId(req.user.id) 
+      });
+      
+      if (user && user.employee_id) {
+        query.employee_id = user.employee_id;
+      } else {
+        return res.json([]);
+      }
+    }
+
+    const requests = await db.collection('requests')
+      .find(query)
+      .sort({ created_at: -1 })
+      .toArray();
+
+    // Buscar dados dos funcionários
+    const requestsWithEmployees = await Promise.all(
+      requests.map(async (request) => {
+        const employee = await db.collection('employees').findOne({ 
+          _id: request.employee_id 
+        });
+        
+        const user = await db.collection('users').findOne({ 
+          _id: request.user_id 
+        });
+
+        return {
+          ...request,
+          employee_name: employee?.name,
+          employee_department: employee?.department,
+          username: user?.username
+        };
+      })
+    );
+
+    res.json(requestsWithEmployees);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Aprovar/rejeitar solicitação (apenas admin)
+app.put('/api/requests/:id/status', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { status, admin_notes } = req.body;
+
+  try {
+    if (![REQUEST_STATUS.APPROVED, REQUEST_STATUS.REJECTED].includes(status)) {
+      return res.status(400).json({ error: 'Status inválido' });
+    }
+
+    const request = await db.collection('requests').findOne({ 
+      _id: new ObjectId(id) 
+    });
+
+    if (!request) {
+      return res.status(404).json({ error: 'Solicitação não encontrada' });
+    }
+
+    const updateData = {
+      status,
+      admin_notes,
+      updated_at: new Date(),
+      processed_by: new ObjectId(req.user.id),
+      processed_at: new Date()
+    };
+
+    // Se aprovada e for solicitação de ponto, criar o registro automaticamente
+    if (status === REQUEST_STATUS.APPROVED && request.type === REQUEST_TYPES.TIME_RECORD) {
+      // Determinar o tipo baseado no horário solicitado
+      let recordType = 'entry';
+      // Lógica simples: se for antes das 12h é entrada, depois é saída
+      const hour = request.requested_time.getHours();
+      if (hour >= 12) {
+        recordType = 'exit';
+      }
+
+      await db.collection('time_records').insertOne({
+        employee_id: request.employee_id,
+        type: recordType,
+        timestamp: request.requested_time,
+        created_by: new ObjectId(req.user.id),
+        created_at: new Date(),
+        is_correction: true,
+        original_request: new ObjectId(id)
+      });
+
+      updateData.correction_applied = true;
+    }
+
+    const result = await db.collection('requests').updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    const updatedRequest = await db.collection('requests').findOne({ _id: new ObjectId(id) });
+    
+    // Buscar dados adicionais
+    const employee = await db.collection('employees').findOne({ _id: request.employee_id });
+    const user = await db.collection('users').findOne({ _id: request.user_id });
+
+    res.json({
+      ...updatedRequest,
+      employee_name: employee?.name,
+      username: user?.username
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== ATUALIZAÇÃO DO REGISTRO DE PAUSA COM JUSTIFICATIVA ====================
+
+// NOVO endpoint para registro de ponto com justificativa para pausas
+app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee, async (req, res) => {
+  const { type, pause_reason_id, custom_reason } = req.body;
+  const timestamp = new Date();
+
+  try {
+    const user = await db.collection('users').findOne({ 
+      _id: new ObjectId(req.user.id) 
+    });
+
+    if (!user || !user.employee_id) {
+      return res.status(400).json({ error: 'Funcionário não vinculado' });
+    }
+
+    // Validar o tipo de registro
+    if (!['entry', 'pause', 'exit'].includes(type)) {
+      return res.status(400).json({ error: 'Tipo de registro inválido. Use: entry, pause ou exit' });
+    }
+
+    // Para pausas, validar justificativa
+    if (type === 'pause') {
+      if (!pause_reason_id && !custom_reason) {
+        return res.status(400).json({ error: 'Justificativa é obrigatória para pausas' });
+      }
+
+      // Se foi selecionada uma razão pré-definida, validar se existe
+      if (pause_reason_id) {
+        const reasonExists = await db.collection('pause_reasons').findOne({ 
+          _id: new ObjectId(pause_reason_id) 
+        });
+        if (!reasonExists) {
+          return res.status(400).json({ error: 'Justificativa selecionada não existe' });
+        }
+      }
+    }
+
+    // Buscar o último registro do funcionário hoje
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const lastRecord = await db.collection('time_records')
+      .findOne({
+        employee_id: user.employee_id,
+        timestamp: { $gte: today }
+      }, {
+        sort: { timestamp: -1 }
+      });
+
+    // Validar regras de negócio
+    if (type === 'entry') {
+      if (lastRecord && lastRecord.type === 'entry') {
+        return res.status(400).json({ 
+          error: 'Você já registrou uma entrada. Registre pausa ou saída primeiro.' 
+        });
+      }
+      if (lastRecord && lastRecord.type === 'pause') {
+        return res.status(400).json({ 
+          error: 'Você está em pausa. Registre saída primeiro antes de uma nova entrada.' 
+        });
+      }
+    } else if (type === 'pause') {
+      if (!lastRecord || lastRecord.type !== 'entry') {
+        return res.status(400).json({ 
+          error: 'Você precisa registrar uma entrada antes de pausar.' 
+        });
+      }
+    } else if (type === 'exit') {
+      if (!lastRecord || (lastRecord.type !== 'entry' && lastRecord.type !== 'pause')) {
+        return res.status(400).json({ 
+          error: 'Você precisa registrar uma entrada antes de sair.' 
+        });
+      }
+    }
+
+    const recordData = {
+      employee_id: user.employee_id,
+      type,
+      timestamp,
+      created_at: new Date()
+    };
+
+    // Adicionar dados da justificativa se for pausa
+    if (type === 'pause') {
+      recordData.pause_reason_id = pause_reason_id ? new ObjectId(pause_reason_id) : null;
+      recordData.custom_reason = custom_reason;
+    }
+
+    const result = await db.collection('time_records').insertOne(recordData);
+
+    const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
+    
+    // Buscar dados do funcionário e da justificativa se houver
+    const employee = await db.collection('employees').findOne({ 
+      _id: user.employee_id 
+    });
+
+    let pause_reason = null;
+    if (type === 'pause' && pause_reason_id) {
+      pause_reason = await db.collection('pause_reasons').findOne({ 
+        _id: new ObjectId(pause_reason_id) 
+      });
+    }
+
+    res.status(201).json({
+      ...newRecord,
+      employee_name: employee?.name,
+      pause_reason: pause_reason
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
