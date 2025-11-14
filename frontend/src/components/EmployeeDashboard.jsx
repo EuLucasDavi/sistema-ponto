@@ -58,21 +58,42 @@ const EmployeeDashboard = () => {
     }
   };
 
+  const submitRequest = async (type, date, reason, description = '', requested_time = '') => {
+    try {
+      // Converter data do formato DD/MM/AAAA para AAAA-MM-DD
+      const [day, month, year] = date.split('/');
+      const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+      await axios.post('/api/requests', {
+        type,
+        date: formattedDate,
+        reason,
+        description,
+        requested_time: type === 'time_record' ? requested_time : null
+      });
+
+      alert('Solicitação enviada com sucesso! Aguarde a aprovação do administrador.');
+    } catch (error) {
+      console.error('Erro ao enviar solicitação:', error);
+      alert(error.response?.data?.error || 'Erro ao enviar solicitação');
+    }
+  };
+
   // FUNÇÃO NOVA: Buscar especificamente registros de HOJE
   const fetchTodayRecords = async () => {
     try {
       const today = new Date();
       const todayStr = today.toISOString().split('T')[0];
-      
+
       const response = await axios.get('/api/me/time-records', {
         params: {
           start_date: todayStr,
           end_date: todayStr
         }
       });
-      
+
       setTodayRecordsList(response.data);
-      
+
       // Determinar o último tipo de registro de HOJE
       if (response.data.length > 0) {
         const lastRecordToday = response.data[response.data.length - 1];
@@ -173,15 +194,15 @@ const EmployeeDashboard = () => {
 
       {/* DEBUG INFO - Remover em produção */}
       {process.env.NODE_ENV === 'development' && (
-        <div style={{ 
-          background: '#f8f9fa', 
-          padding: '10px', 
-          borderRadius: '5px', 
+        <div style={{
+          background: '#f8f9fa',
+          padding: '10px',
+          borderRadius: '5px',
           marginBottom: '20px',
           fontSize: '12px',
           border: '1px solid #dee2e6'
         }}>
-          <strong>Debug:</strong> lastRecordType = {lastRecordType || 'null'}, 
+          <strong>Debug:</strong> lastRecordType = {lastRecordType || 'null'},
           Registros hoje: {todayRecordsList.length}
         </div>
       )}
@@ -320,6 +341,51 @@ const EmployeeDashboard = () => {
                   </button>
                 )}
               </div>
+              {/* Botões de solicitação */}
+              <div className="request-buttons" style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
+                <h4 style={{ marginBottom: '15px', color: '#555' }}>Solicitações</h4>
+
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {/* Botão de solicitação de ausência */}
+                  <button
+                    className="btn btn-info"
+                    onClick={() => {
+                      const date = prompt('Digite a data da ausência (DD/MM/AAAA):');
+                      if (date) {
+                        const reason = prompt('Motivo da ausência:');
+                        if (reason) {
+                          const description = prompt('Descrição detalhada (opcional):');
+                          submitRequest('absence', date, reason, description);
+                        }
+                      }
+                    }}
+                  >
+                    <FiCalendar size={16} />
+                    <span>Solicitar Ausência</span>
+                  </button>
+
+                  {/* Botão de solicitação de registro de ponto */}
+                  <button
+                    className="btn btn-warning"
+                    onClick={() => {
+                      const date = prompt('Digite a data do ponto (DD/MM/AAAA):');
+                      if (date) {
+                        const time = prompt('Digite o horário (HH:MM):');
+                        if (time) {
+                          const reason = prompt('Motivo da solicitação:');
+                          if (reason) {
+                            const description = prompt('Descrição detalhada (opcional):');
+                            submitRequest('time_record', date, reason, description, time);
+                          }
+                        }
+                      }
+                    }}
+                  >
+                    <FiWatch size={16} />
+                    <span>Solicitar Ponto</span>
+                  </button>
+                </div>
+              </div>
 
               {lastRecord && (
                 <div className="last-record-card">
@@ -358,13 +424,13 @@ const EmployeeDashboard = () => {
                     {todayRecordsList.map(record => (
                       <div key={record._id} className="today-record-item">
                         <span className={`record-badge ${record.type}`}>
-                          {record.type === 'entry' ? '→' : 
-                           record.type === 'pause' ? '⏸' : '←'}
+                          {record.type === 'entry' ? '→' :
+                            record.type === 'pause' ? '⏸' : '←'}
                         </span>
                         <span>{new Date(record.timestamp).toLocaleTimeString('pt-BR')}</span>
                         <span className={`record-type-small ${record.type}`}>
                           {record.type === 'entry' ? 'Entrada' :
-                           record.type === 'pause' ? 'Pausa' : 'Saída'}
+                            record.type === 'pause' ? 'Pausa' : 'Saída'}
                         </span>
                       </div>
                     ))}

@@ -13,7 +13,7 @@ import './App.css';
 
 function ProtectedRoute({ children, requireAdmin = false }) {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="loading-container">
@@ -21,11 +21,11 @@ function ProtectedRoute({ children, requireAdmin = false }) {
       </div>
     );
   }
-  
+
   if (!user) {
     return <Navigate to="/login" />;
   }
-  
+
   if (requireAdmin && user.role !== 'admin') {
     return (
       <div className="container">
@@ -35,7 +35,7 @@ function ProtectedRoute({ children, requireAdmin = false }) {
       </div>
     );
   }
-  
+
   return children;
 }
 
@@ -46,7 +46,7 @@ function App() {
         <div className="app">
           <Routes>
             <Route path="/login" element={<Login />} />
-            
+
             {/* Rotas para todos os usuários autenticados */}
             <Route path="/" element={
               <ProtectedRoute>
@@ -55,7 +55,7 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             } />
-            
+
             <Route path="/my-time" element={
               <ProtectedRoute>
                 <Layout>
@@ -63,7 +63,7 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             } />
-            
+
             {/* Rotas apenas para administradores */}
             <Route path="/employees" element={
               <ProtectedRoute requireAdmin={true}>
@@ -72,7 +72,7 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             } />
-            
+
             <Route path="/users" element={
               <ProtectedRoute requireAdmin={true}>
                 <Layout>
@@ -80,7 +80,7 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             } />
-            
+
             <Route path="/reports" element={
               <ProtectedRoute requireAdmin={true}>
                 <Layout>
@@ -88,7 +88,7 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             } />
-            
+
             <Route path="/time-clock" element={
               <ProtectedRoute requireAdmin={true}>
                 <Layout>
@@ -96,7 +96,15 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             } />
-            
+
+            <Route path="/requests" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Requests />
+                </Layout>
+              </ProtectedRoute>
+            } />
+
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

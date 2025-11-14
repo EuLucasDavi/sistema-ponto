@@ -29,8 +29,8 @@ const Layout = ({ children }) => {
   return (
     <div className="layout">
       {/* Botão de menu mobile */}
-      <button 
-        className="mobile-menu-btn" 
+      <button
+        className="mobile-menu-btn"
         onClick={toggleSidebar}
         aria-label="Toggle menu"
       >
@@ -39,8 +39,8 @@ const Layout = ({ children }) => {
 
       {/* Overlay para mobile */}
       {sidebarOpen && (
-        <div 
-          className="sidebar-overlay" 
+        <div
+          className="sidebar-overlay"
           onClick={toggleSidebar}
         />
       )}
@@ -53,12 +53,12 @@ const Layout = ({ children }) => {
           </div>
           <p>{user?.role === 'admin' ? 'Painel Admin' : 'Meu Painel'}</p>
         </div>
-        
+
         <nav>
           <ul>
             <li>
-              <Link 
-                to="/" 
+              <Link
+                to="/"
                 className={isActive('/')}
                 onClick={() => setSidebarOpen(false)}
               >
@@ -66,12 +66,12 @@ const Layout = ({ children }) => {
                 <span>{user?.role === 'admin' ? 'Dashboard' : 'Meu Resumo'}</span>
               </Link>
             </li>
-            
+
             {user?.role === 'admin' ? (
               <>
                 <li>
-                  <Link 
-                    to="/time-clock" 
+                  <Link
+                    to="/time-clock"
                     className={isActive('/time-clock')}
                     onClick={() => setSidebarOpen(false)}
                   >
@@ -80,8 +80,8 @@ const Layout = ({ children }) => {
                   </Link>
                 </li>
                 <li>
-                  <Link 
-                    to="/employees" 
+                  <Link
+                    to="/employees"
                     className={isActive('/employees')}
                     onClick={() => setSidebarOpen(false)}
                   >
@@ -90,8 +90,8 @@ const Layout = ({ children }) => {
                   </Link>
                 </li>
                 <li>
-                  <Link 
-                    to="/users" 
+                  <Link
+                    to="/users"
                     className={isActive('/users')}
                     onClick={() => setSidebarOpen(false)}
                   >
@@ -100,8 +100,18 @@ const Layout = ({ children }) => {
                   </Link>
                 </li>
                 <li>
-                  <Link 
-                    to="/reports" 
+                  <Link
+                    to="/requests"
+                    className={isActive('/requests')}
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <FiFileText size={20} />
+                    <span>Solicitações</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/reports"
                     className={isActive('/reports')}
                     onClick={() => setSidebarOpen(false)}
                   >
@@ -112,8 +122,8 @@ const Layout = ({ children }) => {
               </>
             ) : (
               <li>
-                <Link 
-                  to="/my-time" 
+                <Link
+                  to="/my-time"
                   className={isActive('/my-time')}
                   onClick={() => setSidebarOpen(false)}
                 >
@@ -138,8 +148,8 @@ const Layout = ({ children }) => {
               </div>
             </div>
           </div>
-          <button 
-            onClick={handleLogout} 
+          <button
+            onClick={handleLogout}
             className="btn-logout"
             title="Sair do sistema"
           >
@@ -147,13 +157,13 @@ const Layout = ({ children }) => {
           </button>
         </div>
       </aside>
-      
+
       <main className="main-content">
         <header className="navbar">
           <div className="navbar-left">
             <h2>Ponto Max | Gestão de Jornada</h2>
           </div>
-          
+
           <div className="navbar-user">
             <div className="user-info">
               <div className="user-avatar">
@@ -166,8 +176,8 @@ const Layout = ({ children }) => {
                 </div>
               </div>
             </div>
-            <button 
-              onClick={handleLogout} 
+            <button
+              onClick={handleLogout}
               className="btn btn-secondary btn-logout-desktop"
             >
               <FiLogOut size={16} />
@@ -175,7 +185,7 @@ const Layout = ({ children }) => {
             </button>
           </div>
         </header>
-        
+
         <div className="container">
           {children}
         </div>
