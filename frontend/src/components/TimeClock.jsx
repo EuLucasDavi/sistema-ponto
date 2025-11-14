@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import {
+  FiClock,
+  FiUser,
+  FiLogIn,
+  FiLogOut,
+  FiCheckCircle,
+  FiAlertCircle,
+  FiInfo,
+  FiUsers,
+  FiCalendar,
+  FiWatch
+} from 'react-icons/fi';
 
 const TimeClock = () => {
   const [employees, setEmployees] = useState([]);
@@ -53,70 +65,203 @@ const TimeClock = () => {
     }
   };
 
+  const getCurrentTime = () => {
+    return new Date().toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const [currentTime, setCurrentTime] = useState(getCurrentTime());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(getCurrentTime());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="container">
       <div className="header">
-        <h1>⏰ Registro de Ponto</h1>
-        <p>Registre entradas e saídas dos funcionários</p>
+        <div className="header-title">
+          <FiClock size={32} className="header-icon" />
+          <div>
+            <h1>Registro de Ponto</h1>
+            <p>Registre entradas e saídas dos funcionários</p>
+          </div>
+        </div>
       </div>
 
       {error && (
         <div className="error-message">
-          {error}
+          <FiAlertCircle size={18} />
+          <span>{error}</span>
         </div>
       )}
       
-      <div className="time-clock">
-        <div className="form-group">
-          <label>Selecione o Funcionário:</label>
-          <select 
-            value={selectedEmployee} 
-            onChange={(e) => setSelectedEmployee(e.target.value)}
-            disabled={loading}
-          >
-            <option value="">Selecione um funcionário</option>
-            {employees.map(employee => (
-              <option key={employee._id} value={employee._id}>
-                {employee.name} - {employee.department}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="time-buttons">
-          <button 
-            className="btn btn-entry"
-            onClick={() => registerTime('entry')}
-            disabled={loading || !selectedEmployee}
-          >
-            📥 {loading ? 'Registrando...' : 'Registrar Entrada'}
-          </button>
-          <button 
-            className="btn btn-exit"
-            onClick={() => registerTime('exit')}
-            disabled={loading || !selectedEmployee}
-          >
-            📤 {loading ? 'Registrando...' : 'Registrar Saída'}
-          </button>
-        </div>
-
-        {lastRecord && (
-          <div className="last-record">
-            <h3>✅ Último registro confirmado:</h3>
-            <p><strong>Funcionário:</strong> {lastRecord.employee}</p>
-            <p><strong>Tipo:</strong> {lastRecord.type === 'entry' ? 'Entrada' : 'Saída'}</p>
-            <p><strong>Horário:</strong> {lastRecord.timestamp}</p>
+      <div className="time-clock-container">
+        <div className="time-clock-card">
+          {/* Relógio em tempo real */}
+          <div className="current-time">
+            <FiWatch size={24} />
+            <div className="time-display">{currentTime}</div>
+            <div className="date-display">
+              {new Date().toLocaleDateString('pt-BR', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+              })}
+            </div>
           </div>
-        )}
 
-        <div className="info-card">
-          <h4>💡 Instruções:</h4>
-          <ul>
-            <li>Selecione o funcionário na lista</li>
-            <li>Clique em "Registrar Entrada" ao chegar</li>
-            <li>Clique em "Registrar Saída" ao sair</li>
-            <li>Cada registro é salvo automaticamente</li>
-          </ul>
+          <div className="form-group">
+            <label>
+              <FiUser size={16} />
+              Selecione o Funcionário:
+            </label>
+            <select 
+              value={selectedEmployee} 
+              onChange={(e) => setSelectedEmployee(e.target.value)}
+              disabled={loading}
+            >
+              <option value="">Selecione um funcionário</option>
+              {employees.map(employee => (
+                <option key={employee._id} value={employee._id}>
+                  {employee.name} - {employee.department}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="time-buttons">
+            <button 
+              className="btn btn-success btn-large"
+              onClick={() => registerTime('entry')}
+              disabled={loading || !selectedEmployee}
+            >
+              {loading ? (
+                <>
+                  <div className="loading-spinner"></div>
+                  <span>Registrando...</span>
+                </>
+              ) : (
+                <>
+                  <FiLogIn size={20} />
+                  <span>Registrar Entrada</span>
+                </>
+              )}
+            </button>
+            
+            <button 
+              className="btn btn-danger btn-large"
+              onClick={() => registerTime('exit')}
+              disabled={loading || !selectedEmployee}
+            >
+              {loading ? (
+                <>
+                  <div className="loading-spinner"></div>
+                  <span>Registrando...</span>
+                </>
+              ) : (
+                <>
+                  <FiLogOut size={20} />
+                  <span>Registrar Saída</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {lastRecord && (
+            <div className="last-record-card">
+              <div className="section-header">
+                <FiCheckCircle size={20} color="#28a745" />
+                <h3>Último registro confirmado</h3>
+              </div>
+              <div className="record-details">
+                <div className="record-item">
+                  <FiUser size={16} />
+                  <div>
+                    <strong>Funcionário:</strong>
+                    <span>{lastRecord.employee}</span>
+                  </div>
+                </div>
+                <div className="record-item">
+                  {lastRecord.type === 'entry' ? (
+                    <FiLogIn size={16} color="#28a745" />
+                  ) : (
+                    <FiLogOut size={16} color="#dc3545" />
+                  )}
+                  <div>
+                    <strong>Tipo:</strong>
+                    <span className={`record-type ${lastRecord.type}`}>
+                      {lastRecord.type === 'entry' ? 'Entrada' : 'Saída'}
+                    </span>
+                  </div>
+                </div>
+                <div className="record-item">
+                  <FiCalendar size={16} />
+                  <div>
+                    <strong>Horário:</strong>
+                    <span>{lastRecord.timestamp}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="info-card">
+            <div className="section-header">
+              <FiInfo size={20} />
+              <h4>Instruções</h4>
+            </div>
+            <ul>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Selecione o funcionário na lista
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Clique em "Registrar Entrada" ao chegar
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Clique em "Registrar Saída" ao sair
+              </li>
+              <li>
+                <FiCheckCircle size={16} color="#28a745" />
+                Cada registro é salvo automaticamente
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Card de estatísticas rápidas */}
+        <div className="stats-sidebar">
+          <div className="stat-card">
+            <div className="stat-icon">
+              <FiUsers size={20} />
+            </div>
+            <div className="stat-content">
+              <div className="stat-number">{employees.length}</div>
+              <div className="stat-label">Funcionários</div>
+            </div>
+          </div>
+          
+          <div className="stat-card">
+            <div className="stat-icon">
+              <FiClock size={20} />
+            </div>
+            <div className="stat-content">
+              <div className="stat-number">
+                {lastRecord ? '1' : '0'}
+              </div>
+              <div className="stat-label">Registro Hoje</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

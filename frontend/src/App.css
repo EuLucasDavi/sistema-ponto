@@ -1279,3 +1279,288 @@ body {
 .report-card:nth-child(2) {
   animation-delay: 0.1s;
 }
+
+/* Estilos para o componente TimeClock */
+
+.time-clock-container {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 25px;
+  margin-top: 25px;
+}
+
+.time-clock-card {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border: 1px solid #e9ecef;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.current-time {
+  text-align: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #007bff, #0056b3);
+  border-radius: 12px;
+  color: white;
+  margin-bottom: 10px;
+}
+
+.time-display {
+  font-size: 2.5em;
+  font-weight: bold;
+  margin: 10px 0;
+  font-family: 'Courier New', monospace;
+}
+
+.date-display {
+  font-size: 1.1em;
+  opacity: 0.9;
+  text-transform: capitalize;
+}
+
+.time-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  border: none;
+}
+
+.btn-success:hover {
+  background: linear-gradient(135deg, #218838, #1e7e34);
+  transform: translateY(-2px);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #dc3545, #e83e8c);
+  border: none;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #c82333, #d91a7a);
+  transform: translateY(-2px);
+}
+
+.last-record-card {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  border-left: 4px solid #28a745;
+}
+
+.record-details {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.record-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.record-item div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.record-item strong {
+  font-size: 0.85em;
+  color: #6c757d;
+  text-transform: uppercase;
+}
+
+.record-item span {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.record-type.entry {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.record-type.exit {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.stats-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.stats-sidebar .stat-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border: 1px solid #e9ecef;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  transition: all 0.3s ease;
+}
+
+.stats-sidebar .stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.stats-sidebar .stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, #007bff, #0056b3);
+  border-radius: 10px;
+  color: white;
+}
+
+.stats-sidebar .stat-content {
+  flex: 1;
+}
+
+.stats-sidebar .stat-number {
+  font-size: 1.8em;
+  font-weight: bold;
+  color: #2c3e50;
+  line-height: 1;
+}
+
+.stats-sidebar .stat-label {
+  font-size: 0.9em;
+  color: #6c757d;
+  margin-top: 5px;
+}
+
+/* Animações */
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.time-display {
+  animation: pulse 2s infinite;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.last-record-card {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+/* Responsividade */
+@media (max-width: 968px) {
+  .time-clock-container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .stats-sidebar {
+    flex-direction: row;
+  }
+  
+  .stats-sidebar .stat-card {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .time-clock-card {
+    padding: 20px;
+  }
+  
+  .time-buttons {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .time-display {
+    font-size: 2em;
+  }
+  
+  .current-time {
+    padding: 15px;
+  }
+  
+  .stats-sidebar {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .time-clock-card {
+    padding: 15px;
+  }
+  
+  .time-display {
+    font-size: 1.8em;
+  }
+  
+  .record-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    text-align: left;
+  }
+  
+  .record-item div {
+    width: 100%;
+  }
+}
+
+/* Estados de loading melhorados */
+.btn:disabled {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn:disabled::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
