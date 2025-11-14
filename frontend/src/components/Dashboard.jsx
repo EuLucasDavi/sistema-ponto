@@ -2,7 +2,21 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import {FiBarChart} from 'react-icons/fi';
+import {
+  FiBarChart2,
+  FiUsers,
+  FiUser,
+  FiFileText,
+  FiClock,
+  FiCheckCircle,
+  FiAlertCircle,
+  FiHome,
+  FiSettings,
+  FiArrowRight,
+  FiCalendar,
+  FiDollarSign,
+  FiTrendingUp
+} from 'react-icons/fi';
 
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
@@ -40,41 +54,71 @@ const Dashboard = () => {
     return (
       <div className="container">
         <div className="header">
-          <h1><FiBarChart size={40} /> Dashboard Administrativo</h1>
-          <p>Visão geral do sistema</p>
+          <div className="header-title">
+            <FiBarChart2 size={32} className="header-icon" />
+            <div>
+              <h1>Dashboard Administrativo</h1>
+              <p>Visão geral do sistema</p>
+            </div>
+          </div>
         </div>
 
         {error && (
           <div className="error-message">
-            {error}
+            <FiAlertCircle size={18} />
+            <span>{error}</span>
           </div>
         )}
         
         <div className="stats-grid">
           <div className="stat-card">
+            <div className="stat-icon">
+              <FiUsers size={24} />
+            </div>
             <h3>Total de Funcionários</h3>
             <div className="stat-number">{stats.totalEmployees}</div>
             <p>Funcionários cadastrados</p>
           </div>
           
           <div className="stat-card">
+            <div className="stat-icon">
+              <FiClock size={24} />
+            </div>
             <h3>Registros Hoje</h3>
             <div className="stat-number">{stats.todayRecords}</div>
             <p>Pontos registrados hoje</p>
           </div>
+
+          <div className="stat-card">
+            <div className="stat-icon">
+              <FiTrendingUp size={24} />
+            </div>
+            <h3>Ativos Hoje</h3>
+            <div className="stat-number">{stats.activeToday || 0}</div>
+            <p>Funcionários ativos</p>
+          </div>
         </div>
 
         <div className="recent-section">
-          <h2>👥 Funcionários Recentes</h2>
+          <div className="section-header">
+            <FiUsers size={24} />
+            <h2>Funcionários Recentes</h2>
+          </div>
           <div className="recent-list">
             {stats.recentEmployees && stats.recentEmployees.length > 0 ? (
               stats.recentEmployees.map(employee => (
                 <div key={employee._id} className="recent-item">
-                  <strong>{employee.name}</strong>
-                  <span>{employee.department}</span>
-                  <small>
-                    Admitido em {new Date(employee.hire_date).toLocaleDateString('pt-BR')}
-                  </small>
+                  <div className="recent-item-content">
+                    <div className="recent-item-main">
+                      <strong>{employee.name}</strong>
+                      <span>{employee.department}</span>
+                    </div>
+                    <small>
+                      <FiCalendar size={14} />
+                      Admitido em {new Date(employee.hire_date).toLocaleDateString('pt-BR')}
+                    </small>
+                  </div>
+                  <FiArrowRight size={16} className="recent-item-arrow" />
                 </div>
               ))
             ) : (
@@ -86,25 +130,31 @@ const Dashboard = () => {
         </div>
 
         <div className="info-card">
-          <h3>💡 Ações Rápidas</h3>
+          <div className="section-header">
+            <FiSettings size={24} />
+            <h3>Ações Rápidas</h3>
+          </div>
           <div className="quick-actions">
             <button 
               className="btn btn-primary"
               onClick={() => navigate('/employees')}
             >
-              👥 Gerenciar Funcionários
+              <FiUsers size={18} />
+              <span>Gerenciar Funcionários</span>
             </button>
             <button 
               className="btn btn-primary"
               onClick={() => navigate('/users')}
             >
-              👤 Gerenciar Usuários
+              <FiUser size={18} />
+              <span>Gerenciar Usuários</span>
             </button>
             <button 
               className="btn btn-primary"
               onClick={() => navigate('/reports')}
             >
-              📈 Gerar Relatórios
+              <FiFileText size={18} />
+              <span>Gerar Relatórios</span>
             </button>
           </div>
         </div>
@@ -116,13 +166,19 @@ const Dashboard = () => {
   return (
     <div className="container">
       <div className="header">
-        <h1>👋 Meu Resumo</h1>
-        <p>Bem-vindo de volta!</p>
+        <div className="header-title">
+          <FiHome size={32} className="header-icon" />
+          <div>
+            <h1>Meu Resumo</h1>
+            <p>Bem-vindo de volta!</p>
+          </div>
+        </div>
       </div>
 
       {error && (
         <div className="error-message">
-          {error}
+          <FiAlertCircle size={18} />
+          <span>{error}</span>
         </div>
       )}
 
@@ -130,50 +186,90 @@ const Dashboard = () => {
         <>
           <div className="stats-grid">
             <div className="stat-card">
+              <div className="stat-icon">
+                <FiClock size={24} />
+              </div>
               <h3>Registros Hoje</h3>
               <div className="stat-number">{stats.todayRecords}</div>
               <p>Pontos registrados hoje</p>
             </div>
             
             <div className="stat-card">
+              <div className="stat-icon">
+                {stats.todayRecords > 0 ? (
+                  <FiCheckCircle size={24} color="#28a745" />
+                ) : (
+                  <FiClock size={24} color="#ffc107" />
+                )}
+              </div>
               <h3>Status</h3>
-              <div className="stat-number">
-                {stats.todayRecords > 0 ? '✅ Ativo' : '⏳ Pendente'}
+              <div className="stat-number status-indicator">
+                {stats.todayRecords > 0 ? 'Ativo' : 'Pendente'}
               </div>
               <p>Hoje</p>
             </div>
           </div>
 
           <div className="employee-info-card">
-            <h2>{stats.employee.name}</h2>
-            <p><strong>Departamento:</strong> {stats.employee.department}</p>
-            <p><strong>Salário:</strong> R$ {parseFloat(stats.employee.salary).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+            <div className="section-header">
+              <FiUser size={24} />
+              <h2>{stats.employee.name}</h2>
+            </div>
+            <div className="employee-details">
+              <p>
+                <strong>Departamento:</strong> 
+                <span>{stats.employee.department}</span>
+              </p>
+              <p>
+                <strong>Salário:</strong>
+                <span>
+                  <FiDollarSign size={14} />
+                  R$ {parseFloat(stats.employee.salary).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                </span>
+              </p>
+            </div>
           </div>
 
           <div className="quick-actions">
             <button 
-              className="btn btn-primary"
+              className="btn btn-primary btn-large"
               onClick={() => navigate('/my-time')}
             >
-              ⏰ Registrar Meu Ponto
+              <FiClock size={20} />
+              <span>Registrar Meu Ponto</span>
             </button>
           </div>
 
           <div className="recent-section">
-            <h3>📋 Meus Últimos Registros</h3>
+            <div className="section-header">
+              <FiFileText size={24} />
+              <h3>Meus Últimos Registros</h3>
+            </div>
             <div className="recent-list">
               {stats.recentRecords && stats.recentRecords.length > 0 ? (
                 stats.recentRecords.map(record => (
                   <div key={record._id} className="recent-item">
-                    <div>
-                      <strong>
-                        {new Date(record.timestamp).toLocaleDateString('pt-BR')} - 
-                        {new Date(record.timestamp).toLocaleTimeString('pt-BR')}
-                      </strong>
+                    <div className="recent-item-content">
+                      <div className="recent-item-main">
+                        <strong>
+                          {new Date(record.timestamp).toLocaleDateString('pt-BR')} - 
+                          {new Date(record.timestamp).toLocaleTimeString('pt-BR')}
+                        </strong>
+                        <span className={`record-type ${record.type}`}>
+                          {record.type === 'entry' ? (
+                            <>
+                              <FiCheckCircle size={14} />
+                              ENTRADA
+                            </>
+                          ) : (
+                            <>
+                              <FiAlertCircle size={14} />
+                              SAÍDA
+                            </>
+                          )}
+                        </span>
+                      </div>
                     </div>
-                    <span className={`record-type ${record.type}`}>
-                      {record.type === 'entry' ? '🟢 ENTRADA' : '🔴 SAÍDA'}
-                    </span>
                   </div>
                 ))
               ) : (
@@ -185,8 +281,11 @@ const Dashboard = () => {
           </div>
         </>
       ) : (
-        <div className="info-card">
-          <h3>⚠️ Funcionário Não Vinculado</h3>
+        <div className="info-card error-card">
+          <div className="section-header">
+            <FiAlertCircle size={24} color="#dc3545" />
+            <h3>Funcionário Não Vinculado</h3>
+          </div>
           <p>Seu usuário não está vinculado a um funcionário. Entre em contato com o administrador.</p>
         </div>
       )}
