@@ -7,7 +7,6 @@ import {
   FiTrash2,
   FiX,
   FiSave,
-  FiDollarSign,
   FiCalendar,
   FiMail,
   FiBriefcase,
@@ -298,7 +297,6 @@ const EmployeeManagement = () => {
                 </td>
                 <td className="employee-salary">
                   <div className="employee-info">
-                    <FiDollarSign size={16} />
                     <span>R$ {parseFloat(employee.salary).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                   </div>
                 </td>
