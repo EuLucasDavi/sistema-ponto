@@ -2020,3 +2020,47 @@ body {
     gap: 8px;
   }
 }
+
+.today-records-card {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 20px;
+}
+
+.today-records-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.today-record-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  background: white;
+  border-radius: 4px;
+  border-left: 4px solid #ddd;
+}
+
+.today-record-item .record-badge {
+  font-weight: bold;
+  width: 20px;
+  text-align: center;
+}
+
+.record-badge.entry { color: #28a745; }
+.record-badge.pause { color: #ffc107; }
+.record-badge.exit { color: #dc3545; }
+
+.record-type-small {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #f8f9fa;
+}
+
+.record-type-small.entry { background: #d4edda; color: #155724; }
+.record-type-small.pause { background: #fff3cd; color: #856404; }
+.record-type-small.exit { background: #f8d7da; color: #721c24; }

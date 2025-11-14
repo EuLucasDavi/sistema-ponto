@@ -587,16 +587,7 @@ app.post('/api/time-records', authenticateToken, requireAdmin, async (req, res) 
         sort: { timestamp: -1 }
       });
 
-    // LÓGICA CORRIGIDA - Fluxo permitido:
-    // 1. entry → pause → entry → exit (pausa para almoço)
-    // 2. entry → exit (sem pausa)
-    // 3. entry → pause → exit (pausa sem retorno - não recomendado mas permitido)
-
     if (type === 'entry') {
-      // Pode registrar entrada se:
-      // - Não há registros hoje (primeira entrada do dia)
-      // - Último registro foi saída (novo dia de trabalho)
-      // - Último registro foi pausa (retorno do almoço)
       if (lastRecord && lastRecord.type === 'entry') {
         return res.status(400).json({ 
           error: 'Entrada já registrada. Registre pausa ou saída primeiro.' 

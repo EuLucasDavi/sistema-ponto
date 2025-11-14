@@ -26,10 +26,11 @@ const EmployeeDashboard = () => {
   const [lastRecord, setLastRecord] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastRecordType, setLastRecordType] = useState(null);
+  const [todayRecordsList, setTodayRecordsList] = useState([]); // NOVO ESTADO
 
   useEffect(() => {
     fetchEmployeeData();
-    fetchRecentRecords();
+    fetchTodayRecords(); // CHAMADA ESPECÍFICA PARA REGISTROS DE HOJE
 
     // Atualizar horário em tempo real
     const timer = setInterval(() => {
@@ -57,6 +58,36 @@ const EmployeeDashboard = () => {
     }
   };
 
+  // FUNÇÃO NOVA: Buscar especificamente registros de HOJE
+  const fetchTodayRecords = async () => {
+    try {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      const response = await axios.get('/api/me/time-records', {
+        params: {
+          start_date: todayStr,
+          end_date: todayStr
+        }
+      });
+      
+      setTodayRecordsList(response.data);
+      
+      // Determinar o último tipo de registro de HOJE
+      if (response.data.length > 0) {
+        const lastRecordToday = response.data[response.data.length - 1];
+        setLastRecordType(lastRecordToday.type);
+        console.log('📊 Último registro hoje:', lastRecordToday.type, lastRecordToday.timestamp);
+      } else {
+        setLastRecordType(null);
+        console.log('📊 Nenhum registro hoje');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar registros de hoje:', error);
+      setLastRecordType(null);
+    }
+  };
+
   const fetchRecentRecords = async () => {
     try {
       const today = new Date();
@@ -70,15 +101,6 @@ const EmployeeDashboard = () => {
         }
       });
       setRecentRecords(response.data);
-
-      // Buscar último registro de hoje
-      const todayStr = today.toISOString().split('T')[0];
-      const todayRecords = response.data.filter(r =>
-        r.timestamp.startsWith(todayStr)
-      );
-      if (todayRecords.length > 0) {
-        setLastRecordType(todayRecords[todayRecords.length - 1].type);
-      }
     } catch (error) {
       console.error('Erro ao buscar registros:', error);
     }
@@ -93,6 +115,7 @@ const EmployeeDashboard = () => {
 
       // Atualizar dados
       await fetchEmployeeData();
+      await fetchTodayRecords(); // ATUALIZAR REGISTROS DE HOJE
       await fetchRecentRecords();
 
       // Mostrar último registro
@@ -110,6 +133,16 @@ const EmployeeDashboard = () => {
       setRegisterLoading(false);
     }
   };
+
+  // FUNÇÃO PARA DEBUG - Mostrar estado atual
+  useEffect(() => {
+    console.log('🔍 Estado atual:', {
+      lastRecordType,
+      todayRecords: todayRecordsList.length,
+      todayRecordsList,
+      employeeData: employeeData?.name
+    });
+  }, [lastRecordType, todayRecordsList, employeeData]);
 
   if (loading) {
     return (
@@ -135,6 +168,21 @@ const EmployeeDashboard = () => {
         <div className="error-message">
           <FiAlertCircle size={18} />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* DEBUG INFO - Remover em produção */}
+      {process.env.NODE_ENV === 'development' && (
+        <div style={{ 
+          background: '#f8f9fa', 
+          padding: '10px', 
+          borderRadius: '5px', 
+          marginBottom: '20px',
+          fontSize: '12px',
+          border: '1px solid #dee2e6'
+        }}>
+          <strong>Debug:</strong> lastRecordType = {lastRecordType || 'null'}, 
+          Registros hoje: {todayRecordsList.length}
         </div>
       )}
 
@@ -165,7 +213,7 @@ const EmployeeDashboard = () => {
                 <FiClock size={24} />
               </div>
               <h3>Registros Hoje</h3>
-              <div className="stat-number">{todayRecords}</div>
+              <div className="stat-number">{todayRecordsList.length}</div>
               <p>Pontos registrados hoje</p>
             </div>
           </div>
@@ -188,6 +236,7 @@ const EmployeeDashboard = () => {
               </div>
 
               <div className="time-buttons">
+                {/* BOTÃO ENTRADA - aparece quando não há registros ou último foi saída */}
                 {(!lastRecordType || lastRecordType === 'exit') && (
                   <button
                     className="btn btn-success btn-large"
@@ -208,6 +257,7 @@ const EmployeeDashboard = () => {
                   </button>
                 )}
 
+                {/* BOTÃO PAUSA - aparece apenas se último foi entrada */}
                 {lastRecordType === 'entry' && (
                   <button
                     className="btn btn-warning btn-large"
@@ -228,6 +278,7 @@ const EmployeeDashboard = () => {
                   </button>
                 )}
 
+                {/* BOTÃO RETORNO - aparece apenas se último foi pausa */}
                 {lastRecordType === 'pause' && (
                   <button
                     className="btn btn-success btn-large"
@@ -248,6 +299,7 @@ const EmployeeDashboard = () => {
                   </button>
                 )}
 
+                {/* BOTÃO SAÍDA - aparece se último foi entrada ou pausa */}
                 {(lastRecordType === 'entry' || lastRecordType === 'pause') && (
                   <button
                     className="btn btn-danger btn-large"
@@ -294,6 +346,31 @@ const EmployeeDashboard = () => {
                   </div>
                 </div>
               )}
+
+              {/* Mostrar registros de hoje */}
+              {todayRecordsList.length > 0 && (
+                <div className="today-records-card">
+                  <div className="section-header">
+                    <FiClock size={16} />
+                    <h5>Seus Registros de Hoje</h5>
+                  </div>
+                  <div className="today-records-list">
+                    {todayRecordsList.map(record => (
+                      <div key={record._id} className="today-record-item">
+                        <span className={`record-badge ${record.type}`}>
+                          {record.type === 'entry' ? '→' : 
+                           record.type === 'pause' ? '⏸' : '←'}
+                        </span>
+                        <span>{new Date(record.timestamp).toLocaleTimeString('pt-BR')}</span>
+                        <span className={`record-type-small ${record.type}`}>
+                          {record.type === 'entry' ? 'Entrada' :
+                           record.type === 'pause' ? 'Pausa' : 'Saída'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="stats-sidebar">
@@ -302,7 +379,7 @@ const EmployeeDashboard = () => {
                   <FiTrendingUp size={20} />
                 </div>
                 <div className="stat-content">
-                  <div className="stat-number">{todayRecords}</div>
+                  <div className="stat-number">{todayRecordsList.length}</div>
                   <div className="stat-label">Registros Hoje</div>
                 </div>
               </div>
