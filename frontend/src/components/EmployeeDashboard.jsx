@@ -30,7 +30,7 @@ const EmployeeDashboard = () => {
   useEffect(() => {
     fetchEmployeeData();
     fetchRecentRecords();
-    
+
     // Atualizar horário em tempo real
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -43,7 +43,7 @@ const EmployeeDashboard = () => {
     try {
       setError('');
       const response = await axios.get('/api/dashboard/stats');
-      
+
       if (response.data.role === 'employee') {
         setEmployeeData(response.data.employee);
         setTodayRecords(response.data.todayRecords);
@@ -62,7 +62,7 @@ const EmployeeDashboard = () => {
       const today = new Date();
       const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
       const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      
+
       const response = await axios.get('/api/me/time-records', {
         params: {
           start_date: firstDay.toISOString().split('T')[0],
@@ -70,10 +70,10 @@ const EmployeeDashboard = () => {
         }
       });
       setRecentRecords(response.data);
-      
+
       // Buscar último registro de hoje
       const todayStr = today.toISOString().split('T')[0];
-      const todayRecords = response.data.filter(r => 
+      const todayRecords = response.data.filter(r =>
         r.timestamp.startsWith(todayStr)
       );
       if (todayRecords.length > 0) {
@@ -90,11 +90,11 @@ const EmployeeDashboard = () => {
 
     try {
       const response = await axios.post('/api/me/time-records', { type });
-      
+
       // Atualizar dados
       await fetchEmployeeData();
       await fetchRecentRecords();
-      
+
       // Mostrar último registro
       setLastRecord({
         type,
@@ -102,7 +102,7 @@ const EmployeeDashboard = () => {
         employee: employeeData?.name
       });
       setLastRecordType(type);
-      
+
     } catch (error) {
       console.error('Erro ao registrar ponto:', error);
       setError(error.response?.data?.error || 'Erro ao registrar ponto');
@@ -175,11 +175,11 @@ const EmployeeDashboard = () => {
             <div className="time-clock-card">
               <div className="current-time">
                 <div className="date-display">
-                  {currentTime.toLocaleDateString('pt-BR', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
+                  {currentTime.toLocaleDateString('pt-BR', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
                   })}
                 </div>
                 <div className="time-display">
@@ -189,7 +189,7 @@ const EmployeeDashboard = () => {
 
               <div className="time-buttons">
                 {(!lastRecordType || lastRecordType === 'exit') && (
-                  <button 
+                  <button
                     className="btn btn-success btn-large"
                     onClick={() => registerTime('entry')}
                     disabled={registerLoading}
@@ -207,9 +207,9 @@ const EmployeeDashboard = () => {
                     )}
                   </button>
                 )}
-                
+
                 {lastRecordType === 'entry' && (
-                  <button 
+                  <button
                     className="btn btn-warning btn-large"
                     onClick={() => registerTime('pause')}
                     disabled={registerLoading}
@@ -228,10 +228,30 @@ const EmployeeDashboard = () => {
                   </button>
                 )}
 
+                {lastRecordType === 'pause' && (
+                  <button
+                    className="btn btn-success btn-large"
+                    onClick={() => registerTime('entry')}
+                    disabled={registerLoading}
+                  >
+                    {registerLoading ? (
+                      <>
+                        <div className="loading-spinner"></div>
+                        <span>Registrando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiLogIn size={20} />
+                        <span>Registrar Retorno</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
                 {(lastRecordType === 'entry' || lastRecordType === 'pause') && (
-                  <button 
-                    className={lastRecordType === 'pause' ? 'btn btn-success btn-large' : 'btn btn-danger btn-large'}
-                    onClick={() => registerTime(lastRecordType === 'pause' ? 'entry' : 'exit')}
+                  <button
+                    className="btn btn-danger btn-large"
+                    onClick={() => registerTime('exit')}
                     disabled={registerLoading}
                   >
                     {registerLoading ? (
@@ -242,7 +262,7 @@ const EmployeeDashboard = () => {
                     ) : (
                       <>
                         <FiLogOut size={20} />
-                        <span>{lastRecordType === 'pause' ? 'Registrar Retorno' : 'Registrar Saída'}</span>
+                        <span>Registrar Saída</span>
                       </>
                     )}
                   </button>
@@ -260,8 +280,8 @@ const EmployeeDashboard = () => {
                       <div>
                         <strong>Tipo</strong>
                         <span className={`record-type ${lastRecord.type}`}>
-                          {lastRecord.type === 'entry' ? 'Entrada' : 
-                           lastRecord.type === 'pause' ? 'Pausa' : 'Saída'}
+                          {lastRecord.type === 'entry' ? 'Entrada' :
+                            lastRecord.type === 'pause' ? 'Pausa' : 'Saída'}
                         </span>
                       </div>
                     </div>
@@ -286,7 +306,7 @@ const EmployeeDashboard = () => {
                   <div className="stat-label">Registros Hoje</div>
                 </div>
               </div>
-              
+
               <div className="stat-card">
                 <div className="stat-icon">
                   <FiCalendar size={20} />
@@ -321,8 +341,8 @@ const EmployeeDashboard = () => {
                           </strong>
                         </div>
                         <span className={`record-type ${record.type}`}>
-                          {record.type === 'entry' ? 'ENTRADA' : 
-                           record.type === 'pause' ? 'PAUSA' : 'SAÍDA'}
+                          {record.type === 'entry' ? 'ENTRADA' :
+                            record.type === 'pause' ? 'PAUSA' : 'SAÍDA'}
                         </span>
                       </div>
                     </div>
@@ -357,7 +377,7 @@ const EmployeeDashboard = () => {
                   <li>O sistema captura automaticamente data e hora</li>
                 </ul>
               </div>
-              
+
               <div className="info-section">
                 <h4>
                   <FiLogOut size={18} />

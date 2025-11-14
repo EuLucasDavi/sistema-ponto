@@ -51,7 +51,7 @@ const TimeClock = () => {
         employee_id: selectedEmployee,
         type: type
       });
-      
+
       const now = new Date();
       setLastRecord({
         type,
@@ -59,7 +59,7 @@ const TimeClock = () => {
         employee: employees.find(emp => emp._id === selectedEmployee)?.name
       });
       setLastRecordType(type);
-      
+
     } catch (error) {
       console.error('Erro ao registrar ponto:', error);
       setError(error.response?.data?.error || 'Erro ao registrar ponto');
@@ -85,7 +85,7 @@ const TimeClock = () => {
             end_date: today
           }
         });
-        
+
         if (response.data && response.data.length > 0) {
           setLastRecordType(response.data[response.data.length - 1].type);
         } else {
@@ -136,7 +136,7 @@ const TimeClock = () => {
           <span>{error}</span>
         </div>
       )}
-      
+
       <div className="time-clock-container">
         <div className="time-clock-card">
           {/* Relógio em tempo real */}
@@ -158,8 +158,8 @@ const TimeClock = () => {
               <FiUser size={16} />
               Selecione o Funcionário:
             </label>
-            <select 
-              value={selectedEmployee} 
+            <select
+              value={selectedEmployee}
               onChange={(e) => setSelectedEmployee(e.target.value)}
               disabled={loading}
             >
@@ -174,8 +174,9 @@ const TimeClock = () => {
 
           {selectedEmployee && (
             <div className="time-buttons">
+              {/* Entrada: permitida se não há registro ou último foi saída */}
               {(!lastRecordType || lastRecordType === 'exit') && (
-                <button 
+                <button
                   className="btn btn-success btn-large"
                   onClick={() => registerTime('entry')}
                   disabled={loading || !selectedEmployee}
@@ -193,9 +194,10 @@ const TimeClock = () => {
                   )}
                 </button>
               )}
-              
+
+              {/* Pausa: permitida apenas se último foi entrada */}
               {lastRecordType === 'entry' && (
-                <button 
+                <button
                   className="btn btn-warning btn-large"
                   onClick={() => registerTime('pause')}
                   disabled={loading || !selectedEmployee}
@@ -213,11 +215,33 @@ const TimeClock = () => {
                   )}
                 </button>
               )}
-              
+
+              {/* Retorno: permitido se último foi pausa - usa type 'entry' para retorno */}
+              {lastRecordType === 'pause' && (
+                <button
+                  className="btn btn-success btn-large"
+                  onClick={() => registerTime('entry')}
+                  disabled={loading || !selectedEmployee}
+                >
+                  {loading ? (
+                    <>
+                      <div className="loading-spinner"></div>
+                      <span>Registrando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FiLogIn size={20} />
+                      <span>Registrar Retorno</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Saída: permitida se último foi entrada (com ou sem pausa) */}
               {(lastRecordType === 'entry' || lastRecordType === 'pause') && (
-                <button 
-                  className={lastRecordType === 'pause' ? 'btn btn-success btn-large' : 'btn btn-danger btn-large'}
-                  onClick={() => registerTime(lastRecordType === 'pause' ? 'entry' : 'exit')}
+                <button
+                  className="btn btn-danger btn-large"
+                  onClick={() => registerTime('exit')}
                   disabled={loading || !selectedEmployee}
                 >
                   {loading ? (
@@ -228,7 +252,7 @@ const TimeClock = () => {
                   ) : (
                     <>
                       <FiLogOut size={20} />
-                      <span>{lastRecordType === 'pause' ? 'Registrar Retorno' : 'Registrar Saída'}</span>
+                      <span>Registrar Saída</span>
                     </>
                   )}
                 </button>
@@ -261,8 +285,8 @@ const TimeClock = () => {
                   <div>
                     <strong>Tipo:</strong>
                     <span className={`record-type ${lastRecord.type}`}>
-                      {lastRecord.type === 'entry' ? 'ENTRADA' : 
-                       lastRecord.type === 'pause' ? 'PAUSA' : 'SAÍDA'}
+                      {lastRecord.type === 'entry' ? 'ENTRADA' :
+                        lastRecord.type === 'pause' ? 'PAUSA' : 'SAÍDA'}
                     </span>
                   </div>
                 </div>
@@ -318,7 +342,7 @@ const TimeClock = () => {
               <div className="stat-label">Funcionários</div>
             </div>
           </div>
-          
+
           <div className="stat-card">
             <div className="stat-icon">
               <FiClock size={20} />

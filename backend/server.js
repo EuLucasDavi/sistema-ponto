@@ -584,31 +584,44 @@ app.post('/api/time-records', authenticateToken, requireAdmin, async (req, res) 
         sort: { timestamp: -1 }
       });
 
-    // Validar regras de negócio
+    // LÓGICA CORRIGIDA - Fluxo permitido:
+    // 1. entry → pause → entry → exit (pausa para almoço)
+    // 2. entry → exit (sem pausa)
+    // 3. entry → pause → exit (pausa sem retorno - não recomendado mas permitido)
+
     if (type === 'entry') {
-      // Não pode dar entrada se já houver uma entrada sem saída
+      // Pode registrar entrada se:
+      // - Não há registros hoje (primeira entrada do dia)
+      // - Último registro foi saída (novo dia de trabalho)
+      // - Último registro foi pausa (retorno do almoço)
       if (lastRecord && lastRecord.type === 'entry') {
         return res.status(400).json({ 
-          error: 'Você já registrou uma entrada. Registre pausa ou saída primeiro.' 
+          error: 'Entrada já registrada. Registre pausa ou saída primeiro.' 
         });
       }
-      if (lastRecord && lastRecord.type === 'pause') {
-        return res.status(400).json({ 
-          error: 'Você está em pausa. Registre saída primeiro antes de uma nova entrada.' 
-        });
-      }
-    } else if (type === 'pause') {
-      // Só pode dar pausa se houver entrada sem saída
+      // Permite entrada após saída (novo turno no mesmo dia)
+    } 
+    else if (type === 'pause') {
+      // Só pode pausar se a última ação foi entrada
       if (!lastRecord || lastRecord.type !== 'entry') {
         return res.status(400).json({ 
           error: 'Você precisa registrar uma entrada antes de pausar.' 
         });
       }
-    } else if (type === 'exit') {
-      // Só pode dar saída se houver entrada (e não pode ter saída já registrada)
-      if (!lastRecord || (lastRecord.type !== 'entry' && lastRecord.type !== 'pause')) {
+    } 
+    else if (type === 'exit') {
+      // Pode sair se:
+      // - Último registro foi entrada (expediente sem pausa)
+      // - Último registro foi pausa (saída direta após pausa)
+      // - Último registro foi entrada após retorno (expediente com pausa)
+      if (!lastRecord) {
         return res.status(400).json({ 
-          error: 'Você precisa registrar uma entrada antes de sair.' 
+          error: 'Registro de entrada não encontrado para hoje.' 
+        });
+      }
+      if (lastRecord.type === 'exit') {
+        return res.status(400).json({ 
+          error: 'Saída já registrada para hoje.' 
         });
       }
     }
@@ -652,30 +665,81 @@ app.get('/api/time-records/:employee_id', authenticateToken, requireAdmin, async
 // ==================== ROTAS PESSOAIS DO FUNCIONÁRIO ====================
 
 // Funcionário ver seus próprios dados
-app.get('/api/me/employee', authenticateToken, requireEmployee, async (req, res) => {
+app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
+  const { type } = req.body;
+  const timestamp = new Date();
+
   try {
     const user = await db.collection('users').findOne({ 
       _id: new ObjectId(req.user.id) 
     });
 
-    if (!user) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
+    if (!user || !user.employee_id) {
+      return res.status(400).json({ error: 'Funcionário não vinculado' });
     }
 
-    let employee = null;
-    if (user.employee_id) {
-      employee = await db.collection('employees').findOne({ 
-        _id: user.employee_id 
+    // Validar o tipo de registro
+    if (!['entry', 'pause', 'exit'].includes(type)) {
+      return res.status(400).json({ error: 'Tipo de registro inválido. Use: entry, pause ou exit' });
+    }
+
+    // Buscar o último registro do funcionário hoje
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const lastRecord = await db.collection('time_records')
+      .findOne({
+        employee_id: user.employee_id,
+        timestamp: { $gte: today }
+      }, {
+        sort: { timestamp: -1 }
       });
+
+    // MESMA LÓGICA CORRIGIDA APLICADA AQUI
+    if (type === 'entry') {
+      if (lastRecord && lastRecord.type === 'entry') {
+        return res.status(400).json({ 
+          error: 'Entrada já registrada. Registre pausa ou saída primeiro.' 
+        });
+      }
+    } 
+    else if (type === 'pause') {
+      if (!lastRecord || lastRecord.type !== 'entry') {
+        return res.status(400).json({ 
+          error: 'Você precisa registrar uma entrada antes de pausar.' 
+        });
+      }
+    } 
+    else if (type === 'exit') {
+      if (!lastRecord) {
+        return res.status(400).json({ 
+          error: 'Registro de entrada não encontrado para hoje.' 
+        });
+      }
+      if (lastRecord.type === 'exit') {
+        return res.status(400).json({ 
+          error: 'Saída já registrada para hoje.' 
+        });
+      }
     }
 
-    res.json({
-      user: {
-        id: user._id,
-        username: user.username,
-        role: user.role
-      },
-      employee: employee
+    const result = await db.collection('time_records').insertOne({
+      employee_id: user.employee_id,
+      type,
+      timestamp,
+      created_at: new Date()
+    });
+
+    const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
+    
+    // Buscar dados do funcionário para a resposta
+    const employee = await db.collection('employees').findOne({ 
+      _id: user.employee_id 
+    });
+
+    res.status(201).json({
+      ...newRecord,
+      employee_name: employee?.name
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
