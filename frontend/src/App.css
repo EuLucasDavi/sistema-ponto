@@ -1921,3 +1921,102 @@ body {
   outline: 2px solid #007bff;
   outline-offset: 2px;
 }
+
+/* Estilos para a nova seção de dicas */
+.user-management-tips {
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border: 1px solid #e9ecef;
+  margin-top: 30px;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.tips-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.tips-header h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.3em;
+}
+
+.tips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.tip-card {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+}
+
+.tip-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px 0;
+  color: #2c3e50;
+  font-size: 1em;
+}
+
+.tip-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tip-card li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.85em;
+  color: #495057;
+  line-height: 1.4;
+}
+
+.tip-card li::before {
+  content: '•';
+  color: #007bff;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .tips-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  
+  .user-management-tips {
+    padding: 20px;
+  }
+  
+  .tip-card {
+    padding: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .user-management-tips {
+    padding: 15px;
+  }
+  
+  .tips-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}

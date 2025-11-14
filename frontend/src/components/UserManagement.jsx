@@ -16,7 +16,9 @@ import {
   FiCheckCircle,
   FiUnlock,
   FiLock,
-  FiInfo
+  FiInfo,
+  FiShield,
+  FiAlertTriangle
 } from 'react-icons/fi';
 
 const UserManagement = () => {
@@ -332,173 +334,170 @@ const UserManagement = () => {
         </div>
       )}
 
-      <div className="content-grid">
-        <div className="main-content">
-          <div className="table-container card">
-            <div className="table-header">
-              <h3>Lista de Usuários</h3>
-              <span className="table-count">{users.length} usuário(s)</span>
-            </div>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Username</th>
-                  <th>Tipo</th>
-                  <th>Funcionário Vinculado</th>
-                  <th>Departamento</th>
-                  <th>Data Criação</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map(user => (
-                  <tr key={user._id}>
-                    <td className="user-username">
-                      <div className="user-info">
-                        <FiUser size={16} />
-                        <div>
-                          <strong>{user.username}</strong>
-                          {user.username === 'admin' && (
-                            <div className="admin-badge">
-                              <FiLock size={12} />
-                              <span>Principal</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="user-role">
-                      {getRoleBadge(user.role)}
-                    </td>
-                    <td className="user-employee">
-                      {user.employee ? (
-                        <div className="employee-info">
-                          <div className="employee-name">
-                            <FiUser size={14} />
-                            <strong>{user.employee.name}</strong>
-                          </div>
-                          <div className="employee-email">
-                            <FiMail size={12} />
-                            <span>{user.employee.email}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-muted">Não vinculado</span>
-                      )}
-                    </td>
-                    <td className="user-department">
-                      {user.employee ? (
-                        <span className="department-badge">
-                          <FiBriefcase size={12} />
-                          {user.employee.department}
-                        </span>
-                      ) : (
-                        <span className="text-muted">-</span>
-                      )}
-                    </td>
-                    <td className="user-date">
-                      <div className="date-info">
-                        <FiCalendar size={14} />
-                        <span>{new Date(user.created_at).toLocaleDateString('pt-BR')}</span>
-                      </div>
-                    </td>
-                    <td className="user-actions">
-                      <div className="action-buttons">
-                        <button 
-                          className="btn btn-edit btn-small"
-                          onClick={() => handleEdit(user)}
-                          disabled={loading}
-                          title="Editar usuário"
-                        >
-                          <FiEdit2 size={14} />
-                          <span>Editar</span>
-                        </button>
-                        
-                        {user.employee && (
-                          <button 
-                            className="btn btn-warning btn-small"
-                            onClick={() => handleUnlinkEmployee(user._id, user.username)}
-                            disabled={loading}
-                            title="Desvincular funcionário"
-                          >
-                            <FiUnlock size={14} />
-                            <span>Desvincular</span>
-                          </button>
-                        )}
-                        
-                        {user.username !== 'admin' && (
-                          <button 
-                            className="btn btn-danger btn-small"
-                            onClick={() => handleDelete(user._id, user.username)}
-                            disabled={loading}
-                            title="Excluir usuário"
-                          >
-                            <FiTrash2 size={14} />
-                            <span>Excluir</span>
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                
-                {users.length === 0 && (
-                  <tr>
-                    <td colSpan="6" className="empty-state">
-                      <div className="empty-content">
-                        <FiUsers size={48} />
-                        <h3>Nenhum usuário cadastrado</h3>
-                        <p>Clique em "Novo Usuário" para começar</p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+      {/* ALTERAÇÃO: Removido content-grid e movido sidebar para abaixo da tabela */}
+      <div className="main-content">
+        <div className="table-container card">
+          <div className="table-header">
+            <h3>Lista de Usuários</h3>
+            <span className="table-count">{users.length} usuário(s)</span>
           </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Tipo</th>
+                <th>Funcionário Vinculado</th>
+                <th>Departamento</th>
+                <th>Data Criação</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(user => (
+                <tr key={user._id}>
+                  <td className="user-username">
+                    <div className="user-info">
+                      <FiUser size={16} />
+                      <div>
+                        <strong>{user.username}</strong>
+                        {user.username === 'admin' && (
+                          <div className="admin-badge">
+                            <FiLock size={12} />
+                            <span>Principal</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="user-role">
+                    {getRoleBadge(user.role)}
+                  </td>
+                  <td className="user-employee">
+                    {user.employee ? (
+                      <div className="employee-info">
+                        <div className="employee-name">
+                          <FiUser size={14} />
+                          <strong>{user.employee.name}</strong>
+                        </div>
+                        <div className="employee-email">
+                          <FiMail size={12} />
+                          <span>{user.employee.email}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-muted">Não vinculado</span>
+                    )}
+                  </td>
+                  <td className="user-department">
+                    {user.employee ? (
+                      <span className="department-badge">
+                        <FiBriefcase size={12} />
+                        {user.employee.department}
+                      </span>
+                    ) : (
+                      <span className="text-muted">-</span>
+                    )}
+                  </td>
+                  <td className="user-date">
+                    <div className="date-info">
+                      <FiCalendar size={14} />
+                      <span>{new Date(user.created_at).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  </td>
+                  <td className="user-actions">
+                    <div className="action-buttons">
+                      <button 
+                        className="btn btn-edit btn-small"
+                        onClick={() => handleEdit(user)}
+                        disabled={loading}
+                        title="Editar usuário"
+                      >
+                        <FiEdit2 size={14} />
+                        <span>Editar</span>
+                      </button>
+                      
+                      {user.employee && (
+                        <button 
+                          className="btn btn-warning btn-small"
+                          onClick={() => handleUnlinkEmployee(user._id, user.username)}
+                          disabled={loading}
+                          title="Desvincular funcionário"
+                        >
+                          <FiUnlock size={14} />
+                          <span>Desvincular</span>
+                        </button>
+                      )}
+                      
+                      {user.username !== 'admin' && (
+                        <button 
+                          className="btn btn-danger btn-small"
+                          onClick={() => handleDelete(user._id, user.username)}
+                          disabled={loading}
+                          title="Excluir usuário"
+                        >
+                          <FiTrash2 size={14} />
+                          <span>Excluir</span>
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              
+              {users.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="empty-state">
+                    <div className="empty-content">
+                      <FiUsers size={48} />
+                      <h3>Nenhum usuário cadastrado</h3>
+                      <p>Clique em "Novo Usuário" para começar</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
 
-        <div className="sidebar">
-          <div className="info-card card">
-            <div className="section-header">
-              <FiInfo size={24} />
-              <h3>Tipos de Usuário</h3>
+        {/* ALTERAÇÃO: Nova seção de dicas estilo reports */}
+        <div className="user-management-tips">
+          <div className="tips-header">
+            <FiInfo className="header-icon" size={24} />
+            <h3>Dicas de Gerenciamento de Usuários</h3>
+          </div>
+          <div className="tips-grid">
+            <div className="tip-card">
+              <h4>
+                <FiShield size={18} />
+                Permissões e Segurança
+              </h4>
+              <ul>
+                <li>Atribua permissões de administrador apenas para usuários que necessitam de acesso total ao sistema</li>
+                <li>Revise regularmente as permissões dos usuários</li>
+                <li>Utilize senhas fortes e promova a troca periódica</li>
+              </ul>
             </div>
-            <div className="info-content">
-              <div className="info-section">
-                <h4>
-                  <FiLock size={16} />
-                  Administrador
-                </h4>
-                <ul>
-                  <li>Acesso completo ao sistema</li>
-                  <li>Gerencia funcionários e usuários</li>
-                  <li>Gera relatórios completos</li>
-                  <li>Pode criar outros administradores</li>
-                </ul>
-              </div>
-              
-              <div className="info-section">
-                <h4>
-                  <FiUser size={16} />
-                  Funcionário
-                </h4>
-                <ul>
-                  <li>Registra apenas seu próprio ponto</li>
-                  <li>Visualiza seu histórico</li>
-                  <li>Acesso limitado ao dashboard</li>
-                  <li>Precisa estar vinculado a um funcionário</li>
-                </ul>
-              </div>
-
-              <div className="info-section">
-                <h4>Dicas Importantes</h4>
-                <ul>
-                  <li>O usuário "admin" principal não pode ser excluído</li>
-                  <li>Você pode desvincular funcionários sem excluir o usuário</li>
-                  <li>Usuários sem vínculo não podem registrar ponto</li>
-                </ul>
-              </div>
+            <div className="tip-card">
+              <h4>
+                <FiUsers size={18} />
+                Melhores Práticas
+              </h4>
+              <ul>
+                <li>Mantenha os dados dos usuários sempre atualizados</li>
+                <li>Remova usuários que não estão mais ativos na empresa</li>
+                <li>Documente mudanças importantes no acesso dos usuários</li>
+              </ul>
+            </div>
+            <div className="tip-card">
+              <h4>
+                <FiAlertTriangle size={18} />
+                Importante
+              </h4>
+              <ul>
+                <li>Usuários administradores têm acesso a todos os dados do sistema</li>
+                <li>A exclusão de usuários é irreversível</li>
+                <li>Usuários sem vínculo não podem registrar ponto</li>
+              </ul>
             </div>
           </div>
         </div>

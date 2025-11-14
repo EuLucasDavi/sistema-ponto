@@ -12,8 +12,7 @@ import {
   FiMail,
   FiBriefcase,
   FiUser,
-  FiAlertCircle,
-  FiCheckCircle
+  FiAlertCircle
 } from 'react-icons/fi';
 
 const EmployeeManagement = () => {
@@ -209,7 +208,6 @@ const EmployeeManagement = () => {
 
                 <div className="form-group">
                   <label>
-                    <FiDollarSign size={16} />
                     Salário (R$)
                   </label>
                   <input
