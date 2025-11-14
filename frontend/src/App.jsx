@@ -9,6 +9,7 @@ import UserManagement from './components/UserManagement';
 import Reports from './components/Reports';
 import TimeClock from './components/TimeClock';
 import Layout from './components/Layout';
+import Requests from './components/Requests';
 import './App.css';
 
 function ProtectedRoute({ children, requireAdmin = false }) {
