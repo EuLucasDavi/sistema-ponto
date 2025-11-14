@@ -40,7 +40,7 @@ const Dashboard = () => {
     return (
       <div className="container">
         <div className="header">
-          <h1><FiBarChart size={20} /> Dashboard Administrativo</h1>
+          <h1><FiBarChart size={40} /> Dashboard Administrativo</h1>
           <p>Visão geral do sistema</p>
         </div>
 
