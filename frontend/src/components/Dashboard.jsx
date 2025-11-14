@@ -14,7 +14,6 @@ import {
   FiSettings,
   FiArrowRight,
   FiCalendar,
-  FiDollarSign,
   FiTrendingUp
 } from 'react-icons/fi';
 
@@ -219,13 +218,6 @@ const Dashboard = () => {
               <p>
                 <strong>Departamento:</strong> 
                 <span>{stats.employee.department}</span>
-              </p>
-              <p>
-                <strong>Salário:</strong>
-                <span>
-                  <FiDollarSign size={14} />
-                  R$ {parseFloat(stats.employee.salary).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                </span>
               </p>
             </div>
           </div>

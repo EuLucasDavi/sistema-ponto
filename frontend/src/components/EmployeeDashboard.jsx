@@ -4,7 +4,6 @@ import {
   FiUser,
   FiClock,
   FiCalendar,
-  FiDollarSign,
   FiBriefcase,
   FiLogIn,
   FiLogOut,
@@ -147,17 +146,6 @@ const EmployeeDashboard = () => {
               <h3>Departamento</h3>
               <div className="stat-number">{employeeData.department}</div>
               <p>Área de atuação</p>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon">
-                <FiDollarSign size={24} />
-              </div>
-              <h3>Salário</h3>
-              <div className="stat-number">
-                R$ {parseFloat(employeeData.salary).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-              </div>
-              <p>Remuneração mensal</p>
             </div>
 
             <div className="stat-card">
