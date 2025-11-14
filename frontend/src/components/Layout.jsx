@@ -3,8 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   FiMenu, FiX, FiLogOut, FiBarChart2, FiUsers,
-  FiUser, FiFileText, FiClock, FiBriefcase,
-  FiHome, FiSettings
+  FiUser, FiClock, FiBriefcase,
+  FiHome
 } from 'react-icons/fi';
 
 const Layout = ({ children }) => {
@@ -107,16 +107,6 @@ const Layout = ({ children }) => {
                   >
                     <FiBarChart2 size={20} />
                     <span>Relatórios</span>
-                  </Link>
-                </li>
-                <li>
-                  <Link 
-                    to="/settings" 
-                    className={isActive('/settings')}
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <FiSettings size={20} />
-                    <span>Configurações</span>
                   </Link>
                 </li>
               </>
