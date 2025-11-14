@@ -8,8 +8,7 @@ import {
   FiAlertCircle,
   FiCheckCircle,
   FiClock,
-  FiBriefcase,
-  FiTrendingUp
+  FiBriefcase
 } from 'react-icons/fi';
 
 const Login = () => {
@@ -27,13 +26,13 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     clearError();
-
+    
     if (!username || !password) {
       return;
     }
 
     const result = await login(username, password);
-
+    
     if (result.success) {
       navigate('/');
     }
@@ -41,137 +40,93 @@ const Login = () => {
 
   return (
     <div className="login-page">
-      <div className="login-container">
-        {/* Card de Login */}
-        <div className="login-card">
-          <div className="login-header">
-            <div className="login-logo">
-              <div className="logo-icon-wrapper">
-                <FiBriefcase size={32} />
-              </div>
-              <div className="logo-text">
-                <h1>Ponto Max</h1>
-                <span>Controle de Ponto Eletrônico</span>
-              </div>
-            </div>
-            <p className="login-subtitle">Faça login para acessar o sistema</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="login-form">
-            {error && (
-              <div className="error-message">
-                <FiAlertCircle size={18} />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div className="form-group">
-              <div className="input-wrapper">
-                <FiUser size={20} className="input-icon" />
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Digite seu usuário"
-                  required
-                  disabled={loading}
-                  autoFocus
-                  className="login-input"
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <div className="input-wrapper">
-                <FiLock size={20} className="input-icon" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Digite sua senha"
-                  required
-                  disabled={loading}
-                  className="login-input"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary login-btn"
-              disabled={loading || !username || !password}
-            >
-              {loading ? (
-                <>
-                  <div className="loading-spinner"></div>
-                  <span>Entrando...</span>
-                </>
-              ) : (
-                <>
-                  <FiLogIn size={20} />
-                  <span>Entrar no Sistema</span>
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="login-footer">
-            <div className="feature-grid">
-              <div className="feature-item">
-                <div className="feature-icon">
-                  <FiClock size={18} />
-                </div>
-                <span>Controle de horários</span>
-              </div>
-              <div className="feature-item">
-                <div className="feature-icon">
-                  <FiUser size={18} />
-                </div>
-                <span>Gestão de funcionários</span>
-              </div>
-              <div className="feature-item">
-                <div className="feature-icon">
-                  <FiTrendingUp size={18} />
-                </div>
-                <span>Relatórios profissionais</span>
-              </div>
+      <div className="login-card">
+        {/* Header do Login */}
+        <div className="login-header">
+          <div className="login-logo">
+            <FiBriefcase size={40} className="logo-icon" />
+            <div className="logo-text">
+              <h1>Sistema Ponto</h1>
+              <span>Controle de Ponto Eletrônico</span>
             </div>
           </div>
+          <p className="login-subtitle">Faça login para acessar o sistema</p>
         </div>
 
-        {/* Banner Informativo */}
-        <div className="login-banner">
-          <div className="banner-content">
-            <div className="banner-header">
-              <div className="banner-icon">
-                <FiBriefcase size={48} />
-              </div>
-              <h2>Gestão Completa do Seu Time</h2>
+        <form onSubmit={handleSubmit} className="login-form">
+          {error && (
+            <div className="error-message">
+              <FiAlertCircle size={18} />
+              <span>{error}</span>
             </div>
-            <p>Controle total da jornada de trabalho com relatórios detalhados e gestão eficiente.</p>
-            
-            <div className="banner-features">
-              <div className="banner-feature">
-                <FiCheckCircle size={20} className="feature-check" />
-                <div>
-                  <strong>Registro em tempo real</strong>
-                  <span>Controle preciso de entradas e saídas</span>
-                </div>
-              </div>
-              <div className="banner-feature">
-                <FiCheckCircle size={20} className="feature-check" />
-                <div>
-                  <strong>Relatórios automáticos</strong>
-                  <span>PDF e Excel com cálculos automáticos</span>
-                </div>
-              </div>
-              <div className="banner-feature">
-                <FiCheckCircle size={20} className="feature-check" />
-                <div>
-                  <strong>Controle de horas extras</strong>
-                  <span>Gestão completa da jornada</span>
-                </div>
-              </div>
+          )}
+
+          <div className="form-group">
+            <label>
+              <FiUser size={18} />
+              Usuário
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Digite seu usuário"
+              required
+              disabled={loading}
+              autoFocus
+              className="login-input"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>
+              <FiLock size={18} />
+              Senha
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Digite sua senha"
+              required
+              disabled={loading}
+              className="login-input"
+            />
+          </div>
+
+          <button 
+            type="submit" 
+            className="btn btn-primary login-btn"
+            disabled={loading || !username || !password}
+          >
+            {loading ? (
+              <>
+                <div className="loading-spinner"></div>
+                <span>Entrando...</span>
+              </>
+            ) : (
+              <>
+                <FiLogIn size={20} />
+                <span>Entrar no Sistema</span>
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* Footer do Login */}
+        <div className="login-footer">
+          <div className="feature-list">
+            <div className="feature-item">
+              <FiClock size={16} />
+              <span>Controle de horários</span>
+            </div>
+            <div className="feature-item">
+              <FiUser size={16} />
+              <span>Gestão de funcionários</span>
+            </div>
+            <div className="feature-item">
+              <FiBriefcase size={16} />
+              <span>Relatórios profissionais</span>
             </div>
           </div>
         </div>
