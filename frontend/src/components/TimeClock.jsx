@@ -87,7 +87,7 @@ const TimeClock = () => {
               <h4>Informações do Sistema</h4>
             </div>
             <p>
-              Esta tela agora é apenas para visualização. Para registrar pontos, 
+              Esta tela é apenas para visualização. Para registrar pontos, 
               os funcionários devem usar seus próprios painéis.
             </p>
             <p>
