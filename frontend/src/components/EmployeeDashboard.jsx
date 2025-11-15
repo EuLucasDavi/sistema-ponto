@@ -13,7 +13,8 @@ import {
   FiArrowRight,
   FiHome,
   FiTrendingUp,
-  FiPauseCircle
+  FiPauseCircle,
+  FiWatch
 } from 'react-icons/fi';
 
 const EmployeeDashboard = () => {
