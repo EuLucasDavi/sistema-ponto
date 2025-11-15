@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   FiMenu, FiX, FiLogOut, FiBarChart2, FiUsers,
   FiUser, FiClock, FiBriefcase,
-  FiHome,FiFileText
+  FiHome, FiFileText
 } from 'react-icons/fi';
 
 const Layout = ({ children }) => {
@@ -107,6 +107,16 @@ const Layout = ({ children }) => {
                   >
                     <FiFileText size={20} />
                     <span>Solicitações</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/pause-reasons"
+                    className={isActive('/pause-reasons')}
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <FiList size={20} />
+                    <span>Justificativas</span>
                   </Link>
                 </li>
                 <li>

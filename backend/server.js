@@ -774,6 +774,56 @@ const createDefaultPauseReasons = async () => {
 //   }
 // });
 
+// Editar justificativa
+app.put('/api/pause-reasons/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { name, description } = req.body;
+
+  try {
+    // Verificar se a justificativa existe
+    const existingReason = await db.collection('pause_reasons').findOne({ 
+      _id: new ObjectId(id) 
+    });
+    
+    if (!existingReason) {
+      return res.status(404).json({ error: 'Justificativa não encontrada' });
+    }
+
+    // Verificar se nome já existe (excluindo a própria justificativa)
+    if (name && name !== existingReason.name) {
+      const reasonWithSameName = await db.collection('pause_reasons').findOne({ 
+        name, 
+        _id: { $ne: new ObjectId(id) } 
+      });
+      
+      if (reasonWithSameName) {
+        return res.status(400).json({ error: 'Já existe uma justificativa com este nome' });
+      }
+    }
+
+    const result = await db.collection('pause_reasons').updateOne(
+      { _id: new ObjectId(id) },
+      { 
+        $set: { 
+          name,
+          description,
+          updated_at: new Date()
+        } 
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Justificativa não encontrada' });
+    }
+
+    const updatedReason = await db.collection('pause_reasons').findOne({ _id: new ObjectId(id) });
+    res.json(updatedReason);
+  } catch (error) {
+    console.error('❌ Erro ao editar justificativa:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Funcionário ver seus próprios registros de ponto
 app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
   try {

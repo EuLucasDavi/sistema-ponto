@@ -10,6 +10,7 @@ import Reports from './components/Reports';
 import TimeClock from './components/TimeClock';
 import Layout from './components/Layout';
 import Requests from './components/Requests';
+import PauseReasons from './components/PauseReasons';
 import './App.css';
 
 function ProtectedRoute({ children, requireAdmin = false }) {
@@ -105,6 +106,17 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             } />
+
+            <Route
+              path="/pause-reasons"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <PauseReasons />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
