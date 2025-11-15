@@ -34,6 +34,57 @@ app.use(express.json());
 let db;
 let mongoClient;
 
+const createDefaultPauseReasons = async () => {
+  try {
+    const defaultReasons = [
+      { name: 'Almoço', description: 'Pausa para refeição' },
+      { name: 'Café', description: 'Pausa para café/descanso' },
+      { name: 'Assunto Pessoal', description: 'Assuntos pessoais urgentes' },
+      { name: 'Assunto Corporativo', description: 'Assuntos internos da empresa' },
+      { name: 'Reunião', description: 'Participação em reunião' },
+      { name: 'Médico', description: 'Consulta médica' }
+    ];
+
+    for (const reason of defaultReasons) {
+      const exists = await db.collection('pause_reasons').findOne({ name: reason.name });
+      if (!exists) {
+        await db.collection('pause_reasons').insertOne({
+          ...reason,
+          created_at: new Date()
+        });
+      }
+    }
+    
+    console.log('✅ Justificativas de pausa padrão criadas');
+  } catch (error) {
+    console.error('❌ Erro ao criar justificativas padrão:', error);
+  }
+};
+
+const createDefaultAdmin = async () => {
+  try {
+    const adminExists = await db.collection('users').findOne({ username: 'admin' });
+    if (!adminExists) {
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      await db.collection('users').insertOne({
+        username: 'admin',
+        password: hashedPassword,
+        role: 'admin',
+        created_at: new Date()
+      });
+      console.log('👤 Usuário admin criado: admin / admin123');
+    } else {
+      console.log('👤 Usuário admin já existe');
+    }
+
+    // Criar justificativas padrão
+    await createDefaultPauseReasons();
+  } catch (error) {
+    console.error('❌ Erro ao criar admin:', error);
+  }
+};
+
+
 const connectToMongoDB = async () => {
   try {
     console.log('🔗 Conectando ao MongoDB...');
@@ -60,28 +111,7 @@ const connectToMongoDB = async () => {
   }
 };
 
-const createDefaultAdmin = async () => {
-  try {
-    const adminExists = await db.collection('users').findOne({ username: 'admin' });
-    if (!adminExists) {
-      const hashedPassword = await bcrypt.hash('admin123', 10);
-      await db.collection('users').insertOne({
-        username: 'admin',
-        password: hashedPassword,
-        role: 'admin',
-        created_at: new Date()
-      });
-      console.log('👤 Usuário admin criado: admin / admin123');
-    } else {
-      console.log('👤 Usuário admin já existe');
-    }
 
-    // Criar justificativas padrão
-    await createDefaultPauseReasons();
-  } catch (error) {
-    console.error('❌ Erro ao criar admin:', error);
-  }
-};
 
 // ==================== MIDDLEWARES ====================
 
@@ -663,32 +693,6 @@ app.delete('/api/employees/:id', authenticateToken, requireAdmin, async (req, re
 // });
 
 // Função para criar justificativas padrão
-const createDefaultPauseReasons = async () => {
-  try {
-    const defaultReasons = [
-      { name: 'Almoço', description: 'Pausa para refeição' },
-      { name: 'Café', description: 'Pausa para café/descanso' },
-      { name: 'Assunto Pessoal', description: 'Assuntos pessoais urgentes' },
-      { name: 'Assunto Corporativo', description: 'Assuntos internos da empresa' },
-      { name: 'Reunião', description: 'Participação em reunião' },
-      { name: 'Médico', description: 'Consulta médica' }
-    ];
-
-    for (const reason of defaultReasons) {
-      const exists = await db.collection('pause_reasons').findOne({ name: reason.name });
-      if (!exists) {
-        await db.collection('pause_reasons').insertOne({
-          ...reason,
-          created_at: new Date()
-        });
-      }
-    }
-    
-    console.log('✅ Justificativas de pausa padrão criadas');
-  } catch (error) {
-    console.error('❌ Erro ao criar justificativas padrão:', error);
-  }
-};
 
 // ==================== ROTAS PESSOAIS DO FUNCIONÁRIO ====================
 
@@ -1585,7 +1589,7 @@ app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (re
 });
 
 // Coleção de tipos de justificativa de pausa
-app.get('/api/pause-reasons', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/pause-reasons', authenticateToken, async (req, res) => {
   try {
     const reasons = await db.collection('pause_reasons')
       .find()
