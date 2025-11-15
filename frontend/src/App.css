@@ -77,8 +77,8 @@ body {
 
 .layout {
   display: flex;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
+  flex-direction: column;
 }
 
 .main-content {
