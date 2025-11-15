@@ -34,19 +34,19 @@ const EmployeeDashboard = () => {
   const [todayRecordsList, setTodayRecordsList] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
   const [pauseReasons, setPauseReasons] = useState([]);
-  
+
   // Estados para os modais
   const [showAbsenceModal, setShowAbsenceModal] = useState(false);
   const [showTimeRecordModal, setShowTimeRecordModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
-  
+
   // Estados dos formulários
   const [absenceForm, setAbsenceForm] = useState({
     date: '',
     reason: '',
     description: ''
   });
-  
+
   const [timeRecordForm, setTimeRecordForm] = useState({
     date: '',
     time: '',
@@ -106,7 +106,7 @@ const EmployeeDashboard = () => {
   const submitRequest = async (type, formData) => {
     try {
       setError('');
-      
+
       const requestData = {
         type,
         date: formData.date,
@@ -132,7 +132,7 @@ const EmployeeDashboard = () => {
       // Mostrar mensagem de sucesso
       setError('');
       alert('Solicitação enviada com sucesso! Aguarde a aprovação do administrador.');
-      
+
     } catch (error) {
       console.error('Erro ao enviar solicitação:', error);
       setError(error.response?.data?.error || 'Erro ao enviar solicitação');
@@ -301,8 +301,8 @@ const EmployeeDashboard = () => {
             </div>
 
             {/* Novo card para solicitações pendentes */}
-            <div 
-              className="stat-card clickable" 
+            <div
+              className="stat-card clickable"
               onClick={() => setShowRequestsModal(true)}
               style={{ cursor: 'pointer' }}
             >
@@ -425,7 +425,7 @@ const EmployeeDashboard = () => {
                     onClick={() => setShowAbsenceModal(true)}
                   >
                     <FiCalendar size={16} />
-                    <span>Solicitar Ausência</span>
+                    <span>Justificar Ausência</span>
                   </button>
 
                   <button
@@ -531,8 +531,8 @@ const EmployeeDashboard = () => {
               <div className="modal">
                 <div className="modal-header">
                   <h3>Solicitar Ausência</h3>
-                  <button 
-                    className="btn-close-modal" 
+                  <button
+                    className="btn-close-modal"
                     onClick={() => setShowAbsenceModal(false)}
                   >
                     <FiX size={20} />
@@ -558,7 +558,7 @@ const EmployeeDashboard = () => {
                       <option value="">Selecione um motivo</option>
                       {pauseReasons.map(reason => (
                         <option key={reason._id} value={reason.name}>
-                          {reason.name}
+                          {reason.name} {reason.description && `- ${reason.description}`}
                         </option>
                       ))}
                       <option value="Outro">Outro (especifique na descrição)</option>
@@ -584,8 +584,8 @@ const EmployeeDashboard = () => {
                   <button className="btn btn-secondary" onClick={() => setShowAbsenceModal(false)}>
                     Cancelar
                   </button>
-                  <button 
-                    className="btn btn-primary" 
+                  <button
+                    className="btn btn-primary"
                     onClick={() => submitRequest('absence', absenceForm)}
                     disabled={!absenceForm.date || !absenceForm.reason}
                   >
@@ -602,8 +602,8 @@ const EmployeeDashboard = () => {
               <div className="modal">
                 <div className="modal-header">
                   <h3>Solicitar Registro de Ponto</h3>
-                  <button 
-                    className="btn-close-modal" 
+                  <button
+                    className="btn-close-modal"
                     onClick={() => setShowTimeRecordModal(false)}
                   >
                     <FiX size={20} />
@@ -633,15 +633,16 @@ const EmployeeDashboard = () => {
                   <div className="form-group">
                     <label>Motivo do Esquecimento *</label>
                     <select
-                      value={timeRecordForm.reason}
-                      onChange={(e) => setTimeRecordForm({ ...timeRecordForm, reason: e.target.value })}
+                      value={absenceForm.reason}
+                      onChange={(e) => setAbsenceForm({ ...absenceForm, reason: e.target.value })}
                       required
                     >
                       <option value="">Selecione um motivo</option>
-                      <option value="Esqueci de registrar">Esqueci de registrar o ponto</option>
-                      <option value="Problema no sistema">Problema técnico no sistema</option>
-                      <option value="Ausência justificada">Ausência justificada</option>
-                      <option value="Emergência">Emergência pessoal</option>
+                      {pauseReasons.map(reason => (
+                        <option key={reason._id} value={reason.name}>
+                          {reason.name} {reason.description && `- ${reason.description}`}
+                        </option>
+                      ))}
                       <option value="Outro">Outro (especifique na descrição)</option>
                     </select>
                   </div>
@@ -665,8 +666,8 @@ const EmployeeDashboard = () => {
                   <button className="btn btn-secondary" onClick={() => setShowTimeRecordModal(false)}>
                     Cancelar
                   </button>
-                  <button 
-                    className="btn btn-primary" 
+                  <button
+                    className="btn btn-primary"
                     onClick={() => submitRequest('time_record', timeRecordForm)}
                     disabled={!timeRecordForm.date || !timeRecordForm.time || !timeRecordForm.reason}
                   >
@@ -683,8 +684,8 @@ const EmployeeDashboard = () => {
               <div className="modal large">
                 <div className="modal-header">
                   <h3>Minhas Solicitações</h3>
-                  <button 
-                    className="btn-close-modal" 
+                  <button
+                    className="btn-close-modal"
                     onClick={() => setShowRequestsModal(false)}
                   >
                     <FiX size={20} />
@@ -713,14 +714,14 @@ const EmployeeDashboard = () => {
                               )}
                             </div>
                           </div>
-                          
+
                           <div className="request-details">
                             <div className="detail">
                               <strong>Motivo:</strong> {request.reason}
                             </div>
                             {request.description && (
                               <div className="detail">
-                                <strong>Descrição:</strong> 
+                                <strong>Descrição:</strong>
                                 <div className="description-content">
                                   {request.description}
                                 </div>
@@ -728,7 +729,7 @@ const EmployeeDashboard = () => {
                             )}
                             {request.admin_notes && (
                               <div className="detail admin-notes">
-                                <strong>Observações do Admin:</strong> 
+                                <strong>Observações do Admin:</strong>
                                 <div className="description-content">
                                   {request.admin_notes}
                                 </div>
