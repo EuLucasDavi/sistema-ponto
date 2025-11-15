@@ -531,10 +531,7 @@ const EmployeeDashboard = () => {
               <div className="modal">
                 <div className="modal-header">
                   <h3>Solicitar Ausência</h3>
-                  <button
-                    className="btn-close-modal"
-                    onClick={() => setShowAbsenceModal(false)}
-                  >
+                  <button className="btn-close-modal" onClick={() => setShowAbsenceModal(false)}>
                     <FiX size={20} />
                   </button>
                 </div>
@@ -566,18 +563,12 @@ const EmployeeDashboard = () => {
                   </div>
                   <div className="form-group">
                     <label>Descrição Detalhada</label>
-                    <div className="textarea-container">
-                      <textarea
-                        value={absenceForm.description}
-                        onChange={(e) => setAbsenceForm({ ...absenceForm, description: e.target.value })}
-                        placeholder="Forneça mais detalhes sobre sua ausência..."
-                        rows="4"
-                        className="description-textarea"
-                      />
-                      <div className="textarea-counter">
-                        {absenceForm.description.length}/500
-                      </div>
-                    </div>
+                    <textarea
+                      value={absenceForm.description}
+                      onChange={(e) => setAbsenceForm({ ...absenceForm, description: e.target.value })}
+                      placeholder="Forneça mais detalhes sobre sua ausência..."
+                      rows="4"
+                    />
                   </div>
                 </div>
                 <div className="modal-footer">
@@ -588,6 +579,79 @@ const EmployeeDashboard = () => {
                     className="btn btn-primary"
                     onClick={() => submitRequest('absence', absenceForm)}
                     disabled={!absenceForm.date || !absenceForm.reason}
+                  >
+                    Enviar Solicitação
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal de Solicitação de Registro de Ponto - CORRIGIDO */}
+          {showTimeRecordModal && (
+            <div className="modal-overlay">
+              <div className="modal">
+                <div className="modal-header">
+                  <h3>Solicitar Registro de Ponto</h3>
+                  <button className="btn-close-modal" onClick={() => setShowTimeRecordModal(false)}>
+                    <FiX size={20} />
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Data *</label>
+                      <input
+                        type="date"
+                        value={timeRecordForm.date}
+                        onChange={(e) => setTimeRecordForm({ ...timeRecordForm, date: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Horário *</label>
+                      <input
+                        type="time"
+                        value={timeRecordForm.time}
+                        onChange={(e) => setTimeRecordForm({ ...timeRecordForm, time: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>Motivo do Esquecimento *</label>
+                    <select
+                      value={timeRecordForm.reason}
+                      onChange={(e) => setTimeRecordForm({ ...timeRecordForm, reason: e.target.value })}
+                      required
+                    >
+                      <option value="">Selecione um motivo</option>
+                      {pauseReasons.map(reason => (
+                        <option key={reason._id} value={reason.name}>
+                          {reason.name} {reason.description && `- ${reason.description}`}
+                        </option>
+                      ))}
+                      <option value="Outro">Outro (especifique na descrição)</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Descrição Detalhada</label>
+                    <textarea
+                      value={timeRecordForm.description}
+                      onChange={(e) => setTimeRecordForm({ ...timeRecordForm, description: e.target.value })}
+                      placeholder="Forneça mais detalhes sobre o ocorrido..."
+                      rows="4"
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setShowTimeRecordModal(false)}>
+                    Cancelar
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => submitRequest('time_record', timeRecordForm)}
+                    disabled={!timeRecordForm.date || !timeRecordForm.time || !timeRecordForm.reason}
                   >
                     Enviar Solicitação
                   </button>
@@ -633,7 +697,7 @@ const EmployeeDashboard = () => {
                   <div className="form-group">
                     <label>Motivo do Esquecimento *</label>
                     <select
-                      value={absenceForm.reason}
+                      value={timeRecordForm.reason}
                       onChange={(e) => setAbsenceForm({ ...absenceForm, reason: e.target.value })}
                       required
                     >
