@@ -1567,6 +1567,15 @@ body {
     display: none;
   }
   
+  .btn-logout-desktop span {
+    display: none;
+  }
+  
+  .btn-logout-desktop {
+    padding: 10px;
+    min-width: 44px;
+  }
+  
   .mobile-menu-btn {
     top: 10px;
     left: 10px;
