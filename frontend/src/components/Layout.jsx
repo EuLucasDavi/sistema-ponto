@@ -174,6 +174,7 @@ const Layout = ({ children }) => {
             <h2>Ponto Max | Gestão de Jornada</h2>
           </div>
 
+          {/* REMOVIDO: Botão de sair do topo */}
           <div className="navbar-user">
             <div className="user-info">
               <div className="user-avatar">
@@ -186,13 +187,7 @@ const Layout = ({ children }) => {
                 </div>
               </div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="btn btn-secondary btn-logout-desktop"
-            >
-              <FiLogOut size={16} />
-              <span>Sair</span>
-            </button>
+            {/* Botão de sair removido aqui */}
           </div>
         </header>
 
