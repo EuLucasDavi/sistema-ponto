@@ -14,7 +14,11 @@ import {
   FiHome,
   FiTrendingUp,
   FiPauseCircle,
-  FiWatch
+  FiWatch,
+  FiX,
+  FiFileText,
+  FiCheck,
+  FiEye
 } from 'react-icons/fi';
 
 const EmployeeDashboard = () => {
@@ -27,13 +31,33 @@ const EmployeeDashboard = () => {
   const [lastRecord, setLastRecord] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastRecordType, setLastRecordType] = useState(null);
-  const [todayRecordsList, setTodayRecordsList] = useState([]); // NOVO ESTADO
+  const [todayRecordsList, setTodayRecordsList] = useState([]);
+  const [myRequests, setMyRequests] = useState([]);
+  
+  // Estados para os modais
+  const [showAbsenceModal, setShowAbsenceModal] = useState(false);
+  const [showTimeRecordModal, setShowTimeRecordModal] = useState(false);
+  const [showRequestsModal, setShowRequestsModal] = useState(false);
+  
+  // Estados dos formulários
+  const [absenceForm, setAbsenceForm] = useState({
+    date: '',
+    reason: '',
+    description: ''
+  });
+  
+  const [timeRecordForm, setTimeRecordForm] = useState({
+    date: '',
+    time: '',
+    reason: '',
+    description: ''
+  });
 
   useEffect(() => {
     fetchEmployeeData();
-    fetchTodayRecords(); // CHAMADA ESPECÍFICA PARA REGISTROS DE HOJE
+    fetchTodayRecords();
+    fetchMyRequests();
 
-    // Atualizar horário em tempo real
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
@@ -59,28 +83,51 @@ const EmployeeDashboard = () => {
     }
   };
 
-  const submitRequest = async (type, date, reason, description = '', requested_time = '') => {
+  const fetchMyRequests = async () => {
     try {
-      // Converter data do formato DD/MM/AAAA para AAAA-MM-DD
-      const [day, month, year] = date.split('/');
-      const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-
-      await axios.post('/api/requests', {
-        type,
-        date: formattedDate,
-        reason,
-        description,
-        requested_time: type === 'time_record' ? requested_time : null
-      });
-
-      alert('Solicitação enviada com sucesso! Aguarde a aprovação do administrador.');
+      const response = await axios.get('/api/requests');
+      setMyRequests(response.data);
     } catch (error) {
-      console.error('Erro ao enviar solicitação:', error);
-      alert(error.response?.data?.error || 'Erro ao enviar solicitação');
+      console.error('Erro ao buscar solicitações:', error);
     }
   };
 
-  // FUNÇÃO NOVA: Buscar especificamente registros de HOJE
+  const submitRequest = async (type, formData) => {
+    try {
+      setError('');
+      
+      const requestData = {
+        type,
+        date: formData.date,
+        reason: formData.reason,
+        description: formData.description || '',
+        requested_time: type === 'time_record' ? formData.time : null
+      };
+
+      await axios.post('/api/requests', requestData);
+
+      // Fechar modal e limpar formulário
+      if (type === 'absence') {
+        setShowAbsenceModal(false);
+        setAbsenceForm({ date: '', reason: '', description: '' });
+      } else {
+        setShowTimeRecordModal(false);
+        setTimeRecordForm({ date: '', time: '', reason: '', description: '' });
+      }
+
+      // Recarregar lista de solicitações
+      await fetchMyRequests();
+
+      // Mostrar mensagem de sucesso
+      setError('');
+      alert('Solicitação enviada com sucesso! Aguarde a aprovação do administrador.');
+      
+    } catch (error) {
+      console.error('Erro ao enviar solicitação:', error);
+      setError(error.response?.data?.error || 'Erro ao enviar solicitação');
+    }
+  };
+
   const fetchTodayRecords = async () => {
     try {
       const today = new Date();
@@ -95,14 +142,11 @@ const EmployeeDashboard = () => {
 
       setTodayRecordsList(response.data);
 
-      // Determinar o último tipo de registro de HOJE
       if (response.data.length > 0) {
         const lastRecordToday = response.data[response.data.length - 1];
         setLastRecordType(lastRecordToday.type);
-        console.log('📊 Último registro hoje:', lastRecordToday.type, lastRecordToday.timestamp);
       } else {
         setLastRecordType(null);
-        console.log('📊 Nenhum registro hoje');
       }
     } catch (error) {
       console.error('Erro ao buscar registros de hoje:', error);
@@ -135,12 +179,10 @@ const EmployeeDashboard = () => {
     try {
       const response = await axios.post('/api/me/time-records', { type });
 
-      // Atualizar dados
       await fetchEmployeeData();
-      await fetchTodayRecords(); // ATUALIZAR REGISTROS DE HOJE
+      await fetchTodayRecords();
       await fetchRecentRecords();
 
-      // Mostrar último registro
       setLastRecord({
         type,
         timestamp: new Date().toLocaleString('pt-BR'),
@@ -156,15 +198,38 @@ const EmployeeDashboard = () => {
     }
   };
 
-  // FUNÇÃO PARA DEBUG - Mostrar estado atual
-  useEffect(() => {
-    console.log('🔍 Estado atual:', {
-      lastRecordType,
-      todayRecords: todayRecordsList.length,
-      todayRecordsList,
-      employeeData: employeeData?.name
-    });
-  }, [lastRecordType, todayRecordsList, employeeData]);
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      pending: { class: 'warning', text: 'Pendente', icon: <FiClock size={14} /> },
+      approved: { class: 'success', text: 'Aprovada', icon: <FiCheck size={14} /> },
+      rejected: { class: 'danger', text: 'Rejeitada', icon: <FiX size={14} /> }
+    };
+
+    const config = statusConfig[status] || statusConfig.pending;
+    return (
+      <span className={`badge badge-${config.class}`}>
+        {config.icon}
+        <span style={{ marginLeft: '4px' }}>{config.text}</span>
+      </span>
+    );
+  };
+
+  const getTypeBadge = (type) => {
+    const typeConfig = {
+      absence: { class: 'info', text: 'Ausência', icon: <FiCalendar size={14} /> },
+      time_record: { class: 'primary', text: 'Registro de Ponto', icon: <FiWatch size={14} /> }
+    };
+
+    const config = typeConfig[type] || typeConfig.absence;
+    return (
+      <span className={`badge badge-${config.class}`}>
+        {config.icon}
+        <span style={{ marginLeft: '4px' }}>{config.text}</span>
+      </span>
+    );
+  };
+
+  const pendingRequestsCount = myRequests.filter(req => req.status === 'pending').length;
 
   if (loading) {
     return (
@@ -190,21 +255,6 @@ const EmployeeDashboard = () => {
         <div className="error-message">
           <FiAlertCircle size={18} />
           <span>{error}</span>
-        </div>
-      )}
-
-      {/* DEBUG INFO - Remover em produção */}
-      {process.env.NODE_ENV === 'development' && (
-        <div style={{
-          background: '#f8f9fa',
-          padding: '10px',
-          borderRadius: '5px',
-          marginBottom: '20px',
-          fontSize: '12px',
-          border: '1px solid #dee2e6'
-        }}>
-          <strong>Debug:</strong> lastRecordType = {lastRecordType || 'null'},
-          Registros hoje: {todayRecordsList.length}
         </div>
       )}
 
@@ -238,6 +288,20 @@ const EmployeeDashboard = () => {
               <div className="stat-number">{todayRecordsList.length}</div>
               <p>Pontos registrados hoje</p>
             </div>
+
+            {/* Novo card para solicitações pendentes */}
+            <div 
+              className="stat-card clickable" 
+              onClick={() => setShowRequestsModal(true)}
+              style={{ cursor: 'pointer' }}
+            >
+              <div className="stat-icon">
+                <FiFileText size={24} />
+              </div>
+              <h3>Solicitações</h3>
+              <div className="stat-number">{pendingRequestsCount}</div>
+              <p>Pendentes de aprovação</p>
+            </div>
           </div>
 
           {/* Time Clock */}
@@ -258,7 +322,7 @@ const EmployeeDashboard = () => {
               </div>
 
               <div className="time-buttons">
-                {/* BOTÃO ENTRADA - aparece quando não há registros ou último foi saída */}
+                {/* Botões de registro de ponto (mantidos iguais) */}
                 {(!lastRecordType || lastRecordType === 'exit') && (
                   <button
                     className="btn btn-success btn-large"
@@ -279,7 +343,6 @@ const EmployeeDashboard = () => {
                   </button>
                 )}
 
-                {/* BOTÃO PAUSA - aparece apenas se último foi entrada */}
                 {lastRecordType === 'entry' && (
                   <button
                     className="btn btn-warning btn-large"
@@ -300,7 +363,6 @@ const EmployeeDashboard = () => {
                   </button>
                 )}
 
-                {/* BOTÃO RETORNO - aparece apenas se último foi pausa */}
                 {lastRecordType === 'pause' && (
                   <button
                     className="btn btn-success btn-large"
@@ -321,7 +383,6 @@ const EmployeeDashboard = () => {
                   </button>
                 )}
 
-                {/* BOTÃO SAÍDA - aparece se último foi entrada ou pausa */}
                 {(lastRecordType === 'entry' || lastRecordType === 'pause') && (
                   <button
                     className="btn btn-danger btn-large"
@@ -342,48 +403,39 @@ const EmployeeDashboard = () => {
                   </button>
                 )}
               </div>
-              {/* Botões de solicitação */}
+
+              {/* Botões de solicitação - Agora com modais */}
               <div className="request-buttons" style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
                 <h4 style={{ marginBottom: '15px', color: '#555' }}>Solicitações</h4>
 
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  {/* Botão de solicitação de ausência */}
                   <button
                     className="btn btn-info"
-                    onClick={() => {
-                      const date = prompt('Digite a data da ausência (DD/MM/AAAA):');
-                      if (date) {
-                        const reason = prompt('Motivo da ausência:');
-                        if (reason) {
-                          const description = prompt('Descrição detalhada (opcional):');
-                          submitRequest('absence', date, reason, description);
-                        }
-                      }
-                    }}
+                    onClick={() => setShowAbsenceModal(true)}
                   >
                     <FiCalendar size={16} />
                     <span>Solicitar Ausência</span>
                   </button>
 
-                  {/* Botão de solicitação de registro de ponto */}
                   <button
                     className="btn btn-warning"
-                    onClick={() => {
-                      const date = prompt('Digite a data do ponto (DD/MM/AAAA):');
-                      if (date) {
-                        const time = prompt('Digite o horário (HH:MM):');
-                        if (time) {
-                          const reason = prompt('Motivo da solicitação:');
-                          if (reason) {
-                            const description = prompt('Descrição detalhada (opcional):');
-                            submitRequest('time_record', date, reason, description, time);
-                          }
-                        }
-                      }
-                    }}
+                    onClick={() => setShowTimeRecordModal(true)}
                   >
                     <FiWatch size={16} />
                     <span>Solicitar Ponto</span>
+                  </button>
+
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setShowRequestsModal(true)}
+                  >
+                    <FiEye size={16} />
+                    <span>Ver Minhas Solicitações</span>
+                    {pendingRequestsCount > 0 && (
+                      <span className="badge badge-danger" style={{ marginLeft: '8px' }}>
+                        {pendingRequestsCount}
+                      </span>
+                    )}
                   </button>
                 </div>
               </div>
@@ -414,7 +466,6 @@ const EmployeeDashboard = () => {
                 </div>
               )}
 
-              {/* Mostrar registros de hoje */}
               {todayRecordsList.length > 0 && (
                 <div className="today-records-card">
                   <div className="section-header">
@@ -463,7 +514,198 @@ const EmployeeDashboard = () => {
             </div>
           </div>
 
-          {/* Registros Recentes */}
+          {/* Modal de Solicitação de Ausência */}
+          {showAbsenceModal && (
+            <div className="modal-overlay">
+              <div className="modal">
+                <div className="modal-header">
+                  <h3>Solicitar Ausência</h3>
+                  <button className="btn btn-text" onClick={() => setShowAbsenceModal(false)}>
+                    <FiX size={20} />
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="form-group">
+                    <label>Data da Ausência *</label>
+                    <input
+                      type="date"
+                      value={absenceForm.date}
+                      onChange={(e) => setAbsenceForm({ ...absenceForm, date: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Motivo da Ausência *</label>
+                    <input
+                      type="text"
+                      value={absenceForm.reason}
+                      onChange={(e) => setAbsenceForm({ ...absenceForm, reason: e.target.value })}
+                      placeholder="Ex: Consulta médica, Assunto pessoal..."
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Descrição Detalhada</label>
+                    <textarea
+                      value={absenceForm.description}
+                      onChange={(e) => setAbsenceForm({ ...absenceForm, description: e.target.value })}
+                      placeholder="Forneça mais detalhes sobre sua ausência..."
+                      rows="3"
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setShowAbsenceModal(false)}>
+                    Cancelar
+                  </button>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => submitRequest('absence', absenceForm)}
+                    disabled={!absenceForm.date || !absenceForm.reason}
+                  >
+                    Enviar Solicitação
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal de Solicitação de Registro de Ponto */}
+          {showTimeRecordModal && (
+            <div className="modal-overlay">
+              <div className="modal">
+                <div className="modal-header">
+                  <h3>Solicitar Registro de Ponto</h3>
+                  <button className="btn btn-text" onClick={() => setShowTimeRecordModal(false)}>
+                    <FiX size={20} />
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Data *</label>
+                      <input
+                        type="date"
+                        value={timeRecordForm.date}
+                        onChange={(e) => setTimeRecordForm({ ...timeRecordForm, date: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Horário *</label>
+                      <input
+                        type="time"
+                        value={timeRecordForm.time}
+                        onChange={(e) => setTimeRecordForm({ ...timeRecordForm, time: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>Motivo do Esquecimento *</label>
+                    <input
+                      type="text"
+                      value={timeRecordForm.reason}
+                      onChange={(e) => setTimeRecordForm({ ...timeRecordForm, reason: e.target.value })}
+                      placeholder="Ex: Esqueci de registrar, Problema no sistema..."
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Descrição Detalhada</label>
+                    <textarea
+                      value={timeRecordForm.description}
+                      onChange={(e) => setTimeRecordForm({ ...timeRecordForm, description: e.target.value })}
+                      placeholder="Forneça mais detalhes sobre o ocorrido..."
+                      rows="3"
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setShowTimeRecordModal(false)}>
+                    Cancelar
+                  </button>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => submitRequest('time_record', timeRecordForm)}
+                    disabled={!timeRecordForm.date || !timeRecordForm.time || !timeRecordForm.reason}
+                  >
+                    Enviar Solicitação
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal de Visualização de Solicitações */}
+          {showRequestsModal && (
+            <div className="modal-overlay">
+              <div className="modal large">
+                <div className="modal-header">
+                  <h3>Minhas Solicitações</h3>
+                  <button className="btn btn-text" onClick={() => setShowRequestsModal(false)}>
+                    <FiX size={20} />
+                  </button>
+                </div>
+                <div className="modal-body">
+                  {myRequests.length === 0 ? (
+                    <div className="empty-state">
+                      <FiFileText size={48} />
+                      <h4>Nenhuma solicitação encontrada</h4>
+                      <p>Você ainda não fez nenhuma solicitação.</p>
+                    </div>
+                  ) : (
+                    <div className="requests-list">
+                      {myRequests.map(request => (
+                        <div key={request._id} className="request-item">
+                          <div className="request-header">
+                            <div className="request-type">
+                              {getTypeBadge(request.type)}
+                              {getStatusBadge(request.status)}
+                            </div>
+                            <div className="request-date">
+                              {new Date(request.date).toLocaleDateString('pt-BR')}
+                              {request.requested_time && (
+                                <span> às {new Date(request.requested_time).toLocaleTimeString('pt-BR')}</span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="request-details">
+                            <div className="detail">
+                              <strong>Motivo:</strong> {request.reason}
+                            </div>
+                            {request.description && (
+                              <div className="detail">
+                                <strong>Descrição:</strong> {request.description}
+                              </div>
+                            )}
+                            {request.admin_notes && (
+                              <div className="detail admin-notes">
+                                <strong>Observações do Admin:</strong> {request.admin_notes}
+                              </div>
+                            )}
+                            {request.processed_at && (
+                              <div className="detail">
+                                <strong>Processado em:</strong> {new Date(request.processed_at).toLocaleString('pt-BR')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-primary" onClick={() => setShowRequestsModal(false)}>
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Restante do código (Registros Recentes e Card de Informações) permanece igual */}
           <div className="recent-section">
             <div className="section-header">
               <FiClock size={24} />
@@ -503,7 +745,6 @@ const EmployeeDashboard = () => {
             </div>
           </div>
 
-          {/* Card de Informações */}
           <div className="info-card card">
             <div className="section-header">
               <FiInfo size={24} />
@@ -535,11 +776,12 @@ const EmployeeDashboard = () => {
               </div>
 
               <div className="info-section">
-                <h4>Acompanhamento</h4>
+                <h4>Solicitações</h4>
                 <ul>
-                  <li>Visualize todos seus registros na seção "Meus Últimos Registros"</li>
-                  <li>Confirme sempre o último registro realizado</li>
-                  <li>Em caso de problemas, contate o administrador</li>
+                  <li>Use "Solicitar Ausência" para faltas justificadas</li>
+                  <li>Use "Solicitar Ponto" para registrar horários esquecidos</li>
+                  <li>Acompanhe o status em "Ver Minhas Solicitações"</li>
+                  <li>O administrador pode adicionar observações na resposta</li>
                 </ul>
               </div>
             </div>
