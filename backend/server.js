@@ -49,7 +49,7 @@ const createDefaultPauseReasons = async () => {
         });
       }
     }
-    
+
     console.log('✅ Justificativas de pausa padrão criadas');
   } catch (error) {
     console.error('❌ Erro ao criar justificativas padrão:', error);
@@ -81,19 +81,19 @@ const createDefaultAdmin = async () => {
 const connectToMongoDB = async () => {
   try {
     console.log('🔗 Conectando ao MongoDB...');
-    
+
     mongoClient = new MongoClient(process.env.MONGODB_URI);
     await mongoClient.connect();
     db = mongoClient.db('sistema_ponto');
     console.log('✅ Conectado ao MongoDB Atlas com sucesso!');
-    
+
     await db.collection('users').createIndex({ username: 1 }, { unique: true });
     await db.collection('employees').createIndex({ email: 1 }, { unique: true });
     await db.collection('time_records').createIndex({ employee_id: 1, timestamp: 1 });
     await db.collection('pause_reasons').createIndex({ name: 1 }, { unique: true });
     await db.collection('requests').createIndex({ employee_id: 1, created_at: -1 });
     await db.collection('requests').createIndex({ status: 1 });
-    
+
     await createDefaultAdmin();
   } catch (error) {
     console.error('❌ Erro ao conectar com MongoDB:', error.message);
@@ -146,7 +146,7 @@ app.get('/health', async (req, res) => {
       }
     }
 
-    res.json({ 
+    res.json({
       status: 'OK',
       service: 'Sistema Ponto Backend',
       timestamp: new Date().toISOString(),
@@ -156,9 +156,9 @@ app.get('/health', async (req, res) => {
       version: '1.0.0'
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'Error',
-      error: error.message 
+      error: error.message
     });
   }
 });
@@ -168,7 +168,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/test', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'API está funcionando!',
     timestamp: new Date().toISOString()
   });
@@ -176,7 +176,7 @@ app.get('/api/test', (req, res) => {
 
 app.post('/api/login', async (req, res) => {
   console.log('🔐 Recebida requisição de login');
-  
+
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -210,14 +210,14 @@ app.post('/api/login', async (req, res) => {
 
     console.log('✅ Login bem-sucedido:', username);
 
-    res.json({ 
+    res.json({
       success: true,
-      token, 
-      user: { 
-        id: user._id, 
-        username: user.username, 
-        role: user.role 
-      } 
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        role: user.role
+      }
     });
   } catch (error) {
     console.error('❌ Erro no login:', error);
@@ -239,8 +239,8 @@ app.post('/api/register', authenticateToken, requireAdmin, async (req, res) => {
     }
 
     if (employee_id) {
-      const employee = await db.collection('employees').findOne({ 
-        _id: new ObjectId(employee_id) 
+      const employee = await db.collection('employees').findOne({
+        _id: new ObjectId(employee_id)
       });
       if (!employee) {
         return res.status(400).json({ error: 'Funcionário não encontrado' });
@@ -248,7 +248,7 @@ app.post('/api/register', authenticateToken, requireAdmin, async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    
+
     const userData = {
       username,
       password: hashedPassword,
@@ -272,18 +272,18 @@ app.post('/api/register', authenticateToken, requireAdmin, async (req, res) => {
 app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     console.log('👥 Buscando lista de usuários...');
-    
+
     const users = await db.collection('users')
       .find({}, { projection: { password: 0 } })
       .sort({ username: 1 })
       .toArray();
-    
+
     const usersWithEmployees = await Promise.all(
       users.map(async (user) => {
         let employee = null;
         if (user.employee_id) {
-          employee = await db.collection('employees').findOne({ 
-            _id: user.employee_id 
+          employee = await db.collection('employees').findOne({
+            _id: user.employee_id
           });
         }
         return {
@@ -307,21 +307,21 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
 
   try {
     console.log('✏️ Editando usuário:', id);
-    
-    const existingUser = await db.collection('users').findOne({ 
-      _id: new ObjectId(id) 
+
+    const existingUser = await db.collection('users').findOne({
+      _id: new ObjectId(id)
     });
-    
+
     if (!existingUser) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
     if (username && username !== existingUser.username) {
-      const userWithSameUsername = await db.collection('users').findOne({ 
-        username, 
-        _id: { $ne: new ObjectId(id) } 
+      const userWithSameUsername = await db.collection('users').findOne({
+        username,
+        _id: { $ne: new ObjectId(id) }
       });
-      
+
       if (userWithSameUsername) {
         return res.status(400).json({ error: 'Username já está em uso' });
       }
@@ -332,8 +332,8 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
     }
 
     if (employee_id) {
-      const employee = await db.collection('employees').findOne({ 
-        _id: new ObjectId(employee_id) 
+      const employee = await db.collection('employees').findOne({
+        _id: new ObjectId(employee_id)
       });
       if (!employee) {
         return res.status(400).json({ error: 'Funcionário não encontrado' });
@@ -347,7 +347,7 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
     if (username) updateData.username = username;
     if (employee_id) updateData.employee_id = new ObjectId(employee_id);
     if (role) updateData.role = role;
-    
+
     if (password) {
       updateData.password = await bcrypt.hash(password, 10);
     }
@@ -372,8 +372,8 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
 
     let employee = null;
     if (updatedUser.employee_id) {
-      employee = await db.collection('employees').findOne({ 
-        _id: updatedUser.employee_id 
+      employee = await db.collection('employees').findOne({
+        _id: updatedUser.employee_id
       });
     }
 
@@ -393,11 +393,11 @@ app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) =
 
   try {
     console.log('🗑️ Excluindo usuário:', id);
-    
-    const userToDelete = await db.collection('users').findOne({ 
-      _id: new ObjectId(id) 
+
+    const userToDelete = await db.collection('users').findOne({
+      _id: new ObjectId(id)
     });
-    
+
     if (!userToDelete) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
@@ -406,8 +406,8 @@ app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) =
       return res.status(400).json({ error: 'Não é possível excluir o usuário admin principal' });
     }
 
-    const result = await db.collection('users').deleteOne({ 
-      _id: new ObjectId(id) 
+    const result = await db.collection('users').deleteOne({
+      _id: new ObjectId(id)
     });
 
     if (result.deletedCount === 0) {
@@ -427,14 +427,14 @@ app.put('/api/users/:id/unlink-employee', authenticateToken, requireAdmin, async
 
   try {
     console.log('🔗 Desvinculando funcionário do usuário:', id);
-    
+
     const result = await db.collection('users').updateOne(
       { _id: new ObjectId(id) },
-      { 
-        $set: { 
+      {
+        $set: {
           employee_id: null,
           updated_at: new Date()
-        } 
+        }
       }
     );
 
@@ -458,12 +458,12 @@ app.put('/api/users/:id/unlink-employee', authenticateToken, requireAdmin, async
 app.get('/api/employees', authenticateToken, async (req, res) => {
   try {
     console.log('👥 Buscando lista de funcionários...');
-    
+
     const employees = await db.collection('employees')
       .find()
       .sort({ name: 1 })
       .toArray();
-    
+
     console.log(`✅ Encontrados ${employees.length} funcionários`);
     res.json(employees);
   } catch (error) {
@@ -503,14 +503,14 @@ app.put('/api/employees/:id', authenticateToken, requireAdmin, async (req, res) 
   try {
     const result = await db.collection('employees').updateOne(
       { _id: new ObjectId(id) },
-      { 
-        $set: { 
-          name, 
-          email, 
-          department, 
+      {
+        $set: {
+          name,
+          email,
+          department,
           salary: parseFloat(salary),
           updated_at: new Date()
-        } 
+        }
       }
     );
 
@@ -534,7 +534,7 @@ app.delete('/api/employees/:id', authenticateToken, requireAdmin, async (req, re
 
   try {
     const result = await db.collection('employees').deleteOne({ _id: new ObjectId(id) });
-    
+
     if (result.deletedCount === 0) {
       return res.status(404).json({ error: 'Funcionário não encontrado' });
     }
@@ -549,8 +549,8 @@ app.delete('/api/employees/:id', authenticateToken, requireAdmin, async (req, re
 
 app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
   try {
-    const user = await db.collection('users').findOne({ 
-      _id: new ObjectId(req.user.id) 
+    const user = await db.collection('users').findOne({
+      _id: new ObjectId(req.user.id)
     });
 
     if (!user || !user.employee_id) {
@@ -558,9 +558,9 @@ app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, 
     }
 
     const { start_date, end_date } = req.query;
-    
+
     let query = { employee_id: user.employee_id };
-    
+
     if (start_date && end_date) {
       query.timestamp = {
         $gte: new Date(start_date),
@@ -585,8 +585,8 @@ app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req,
   const timestamp = new Date();
 
   try {
-    const user = await db.collection('users').findOne({ 
-      _id: new ObjectId(req.user.id) 
+    const user = await db.collection('users').findOne({
+      _id: new ObjectId(req.user.id)
     });
 
     if (!user || !user.employee_id) {
@@ -599,7 +599,7 @@ app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req,
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const lastRecord = await db.collection('time_records')
       .findOne({
         employee_id: user.employee_id,
@@ -609,21 +609,26 @@ app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req,
       });
 
     if (type === 'entry') {
-      if (lastRecord && lastRecord.type === 'entry') {
-        return res.status(400).json({ 
-          error: 'Entrada já registrada. Registre uma pausa ou saída primeiro.' 
+      // Entrada é permitida exceto se o último registro for saída
+      if (lastRecord && lastRecord.type === 'exit') {
+        return res.status(400).json({
+          error: 'O dia já foi encerrado. Registre novamente amanhã.'
         });
       }
-    } else if (type === 'pause') {
+    }
+
+    if (type === 'pause') {
       if (!lastRecord || lastRecord.type !== 'entry') {
-        return res.status(400).json({ 
-          error: 'Você precisa registrar uma entrada antes de pausar.' 
+        return res.status(400).json({
+          error: 'Você só pode pausar após uma entrada.'
         });
       }
-    } else if (type === 'exit') {
+    }
+
+    if (type === 'exit') {
       if (!lastRecord || (lastRecord.type !== 'entry' && lastRecord.type !== 'pause')) {
-        return res.status(400).json({ 
-          error: 'Registro de entrada não encontrado para hoje.' 
+        return res.status(400).json({
+          error: 'Registre uma entrada antes de encerrar o dia.'
         });
       }
     }
@@ -636,9 +641,9 @@ app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req,
     });
 
     const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
-    
-    const employee = await db.collection('employees').findOne({ 
-      _id: user.employee_id 
+
+    const employee = await db.collection('employees').findOne({
+      _id: user.employee_id
     });
 
     res.status(201).json({
@@ -654,10 +659,10 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
   try {
     if (req.user.role === 'admin') {
       const totalEmployees = await db.collection('employees').countDocuments();
-      
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       const todayRecords = await db.collection('time_records')
         .countDocuments({
           timestamp: { $gte: today }
@@ -676,8 +681,8 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         recentEmployees
       });
     } else {
-      const user = await db.collection('users').findOne({ 
-        _id: new ObjectId(req.user.id) 
+      const user = await db.collection('users').findOne({
+        _id: new ObjectId(req.user.id)
       });
 
       if (!user || !user.employee_id) {
@@ -689,13 +694,13 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         });
       }
 
-      const employee = await db.collection('employees').findOne({ 
-        _id: user.employee_id 
+      const employee = await db.collection('employees').findOne({
+        _id: user.employee_id
       });
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       const todayRecords = await db.collection('time_records')
         .countDocuments({
           employee_id: user.employee_id,
@@ -756,20 +761,20 @@ app.put('/api/pause-reasons/:id', authenticateToken, requireAdmin, async (req, r
   const { name, description } = req.body;
 
   try {
-    const existingReason = await db.collection('pause_reasons').findOne({ 
-      _id: new ObjectId(id) 
+    const existingReason = await db.collection('pause_reasons').findOne({
+      _id: new ObjectId(id)
     });
-    
+
     if (!existingReason) {
       return res.status(404).json({ error: 'Justificativa não encontrada' });
     }
 
     if (name && name !== existingReason.name) {
-      const reasonWithSameName = await db.collection('pause_reasons').findOne({ 
-        name, 
-        _id: { $ne: new ObjectId(id) } 
+      const reasonWithSameName = await db.collection('pause_reasons').findOne({
+        name,
+        _id: { $ne: new ObjectId(id) }
       });
-      
+
       if (reasonWithSameName) {
         return res.status(400).json({ error: 'Já existe uma justificativa com este nome' });
       }
@@ -777,12 +782,12 @@ app.put('/api/pause-reasons/:id', authenticateToken, requireAdmin, async (req, r
 
     const result = await db.collection('pause_reasons').updateOne(
       { _id: new ObjectId(id) },
-      { 
-        $set: { 
+      {
+        $set: {
           name,
           description,
           updated_at: new Date()
-        } 
+        }
       }
     );
 
@@ -803,7 +808,7 @@ app.delete('/api/pause-reasons/:id', authenticateToken, requireAdmin, async (req
 
   try {
     const result = await db.collection('pause_reasons').deleteOne({ _id: new ObjectId(id) });
-    
+
     if (result.deletedCount === 0) {
       return res.status(404).json({ error: 'Justificativa não encontrada' });
     }
@@ -829,8 +834,8 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
   const { type, date, reason, description, requested_time } = req.body;
 
   try {
-    const user = await db.collection('users').findOne({ 
-      _id: new ObjectId(req.user.id) 
+    const user = await db.collection('users').findOne({
+      _id: new ObjectId(req.user.id)
     });
 
     if (!user || !user.employee_id) {
@@ -859,9 +864,9 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
     });
 
     const newRequest = await db.collection('requests').findOne({ _id: result.insertedId });
-    
-    const employee = await db.collection('employees').findOne({ 
-      _id: user.employee_id 
+
+    const employee = await db.collection('employees').findOne({
+      _id: user.employee_id
     });
 
     res.status(201).json({
@@ -876,12 +881,12 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
 app.get('/api/requests', authenticateToken, async (req, res) => {
   try {
     let query = {};
-    
+
     if (req.user.role !== 'admin') {
-      const user = await db.collection('users').findOne({ 
-        _id: new ObjectId(req.user.id) 
+      const user = await db.collection('users').findOne({
+        _id: new ObjectId(req.user.id)
       });
-      
+
       if (user && user.employee_id) {
         query.employee_id = user.employee_id;
       } else {
@@ -896,12 +901,12 @@ app.get('/api/requests', authenticateToken, async (req, res) => {
 
     const requestsWithEmployees = await Promise.all(
       requests.map(async (request) => {
-        const employee = await db.collection('employees').findOne({ 
-          _id: request.employee_id 
+        const employee = await db.collection('employees').findOne({
+          _id: request.employee_id
         });
-        
-        const user = await db.collection('users').findOne({ 
-          _id: request.user_id 
+
+        const user = await db.collection('users').findOne({
+          _id: request.user_id
         });
 
         return {
@@ -928,8 +933,8 @@ app.put('/api/requests/:id/status', authenticateToken, requireAdmin, async (req,
       return res.status(400).json({ error: 'Status inválido' });
     }
 
-    const request = await db.collection('requests').findOne({ 
-      _id: new ObjectId(id) 
+    const request = await db.collection('requests').findOne({
+      _id: new ObjectId(id)
     });
 
     if (!request) {
@@ -970,7 +975,7 @@ app.put('/api/requests/:id/status', authenticateToken, requireAdmin, async (req,
     );
 
     const updatedRequest = await db.collection('requests').findOne({ _id: new ObjectId(id) });
-    
+
     const employee = await db.collection('employees').findOne({ _id: request.employee_id });
     const user = await db.collection('users').findOne({ _id: request.user_id });
 
@@ -989,8 +994,8 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
   const timestamp = new Date();
 
   try {
-    const user = await db.collection('users').findOne({ 
-      _id: new ObjectId(req.user.id) 
+    const user = await db.collection('users').findOne({
+      _id: new ObjectId(req.user.id)
     });
 
     if (!user || !user.employee_id) {
@@ -1007,8 +1012,8 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
       }
 
       if (pause_reason_id) {
-        const reasonExists = await db.collection('pause_reasons').findOne({ 
-          _id: new ObjectId(pause_reason_id) 
+        const reasonExists = await db.collection('pause_reasons').findOne({
+          _id: new ObjectId(pause_reason_id)
         });
         if (!reasonExists) {
           return res.status(400).json({ error: 'Justificativa selecionada não existe' });
@@ -1018,7 +1023,7 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const lastRecord = await db.collection('time_records')
       .findOne({
         employee_id: user.employee_id,
@@ -1029,20 +1034,20 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
 
     if (type === 'entry') {
       if (lastRecord && lastRecord.type === 'entry') {
-        return res.status(400).json({ 
-          error: 'Entrada já registrada. Registre uma pausa ou saída primeiro.' 
+        return res.status(400).json({
+          error: 'Entrada já registrada. Registre uma pausa ou saída primeiro.'
         });
       }
     } else if (type === 'pause') {
       if (!lastRecord || lastRecord.type !== 'entry') {
-        return res.status(400).json({ 
-          error: 'Você precisa registrar uma entrada antes de pausar.' 
+        return res.status(400).json({
+          error: 'Você precisa registrar uma entrada antes de pausar.'
         });
       }
     } else if (type === 'exit') {
       if (!lastRecord || (lastRecord.type !== 'entry' && lastRecord.type !== 'pause')) {
-        return res.status(400).json({ 
-          error: 'Registro de entrada não encontrado para hoje.' 
+        return res.status(400).json({
+          error: 'Registro de entrada não encontrado para hoje.'
         });
       }
     }
@@ -1062,15 +1067,15 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
     const result = await db.collection('time_records').insertOne(recordData);
 
     const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
-    
-    const employee = await db.collection('employees').findOne({ 
-      _id: user.employee_id 
+
+    const employee = await db.collection('employees').findOne({
+      _id: user.employee_id
     });
 
     let pause_reason = null;
     if (type === 'pause' && pause_reason_id) {
-      pause_reason = await db.collection('pause_reasons').findOne({ 
-        _id: new ObjectId(pause_reason_id) 
+      pause_reason = await db.collection('pause_reasons').findOne({
+        _id: new ObjectId(pause_reason_id)
       });
     }
 
@@ -1087,7 +1092,7 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
 const startServer = async () => {
   try {
     await connectToMongoDB();
-    
+
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {
       console.log('🚀 =================================');
