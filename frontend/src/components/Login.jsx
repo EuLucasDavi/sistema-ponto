@@ -6,10 +6,10 @@ import {
   FiUser,
   FiLock,
   FiAlertCircle,
-  FiCheckCircle,
   FiClock,
   FiBriefcase
 } from 'react-icons/fi';
+import { FaFingerprint } from "react-icons/fa";
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -44,7 +44,7 @@ const Login = () => {
         {/* Header do Login */}
         <div className="login-header">
           <div className="login-logo">
-            <FiBriefcase size={40} className="logo-icon" />
+            <FaFingerprint size={40} className="logo-icon" />
             <div className="logo-text">
               <h1>Ponto Max</h1>
               <span>Controle de Ponto Eletrônico</span>
