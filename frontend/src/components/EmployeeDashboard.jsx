@@ -770,7 +770,7 @@ const EmployeeDashboard = () => {
           <p>Seu usuário não está vinculado a um funcionário.</p>
           <div className="quick-actions">
             <button className="btn btn-primary"><FiUser size={18} /><span>Solicitar Vinculação</span></button>
-            <button className="btn btn-secondary"><FiInfo size={18} /><span>Contatar Admin</span></button>
+            <button className="btn btn-secondary"><FiInfo size={18} /><span>Contatar Administrador</span></button>
           </div>
         </div>
       )}
