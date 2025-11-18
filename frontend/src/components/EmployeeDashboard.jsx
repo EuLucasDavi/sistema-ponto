@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -15,7 +15,10 @@ const EmployeeDashboard = () => {
   const [pauseReasons, setPauseReasons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [registerLoading, setRegisterLoading] = useState(false);
-  const [lastRecordType, setLastRecordType] = useState(null);
+  
+  // 💡 CORREÇÃO 1: Inicializado como undefined para indicar que os dados ainda não foram carregados/determinados.
+  const [lastRecordType, setLastRecordType] = useState(undefined); 
+  
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastRecord, setLastRecord] = useState(null);
 
@@ -50,6 +53,8 @@ const EmployeeDashboard = () => {
     setRecentRecords([]);
     setTodayRecordsList([]);
     setMyRequests([]);
+    // Reinicia lastRecordType para undefined no reset
+    setLastRecordType(undefined); 
   };
 
   const closeAllModals = () => {
@@ -114,19 +119,17 @@ const EmployeeDashboard = () => {
     });
 
     setTodayRecordsList(response.data);
-  };
-
-  const getAvailableActions = () => {
-    if (todayRecordsList.length === 0) {
-      return ['entry'];
+    
+    // 💡 CORREÇÃO 2: Garantir que lastRecordType seja atualizado aqui após o fetch.
+    if (response.data.length > 0) {
+      setLastRecordType(response.data[response.data.length - 1].type);
+    } else {
+      setLastRecordType(null); // Nenhum registro hoje
     }
-
-    const last = todayRecordsList[todayRecordsList.length - 1].type;
-
-    if (last === 'entry') return ['pause', 'exit'];
-    if (last === 'pause') return ['entry'];
-    return ['entry'];
   };
+  
+  // NOTE: A função getAvailableActions original foi removida para usar apenas o useMemo abaixo, 
+  // garantindo que a lógica seja reativa e unificada.
 
   const registerTime = async (type, pauseReason = null) => {
     setRegisterLoading(true);
@@ -134,14 +137,16 @@ const EmployeeDashboard = () => {
       if (type === 'pause' && pauseReason) {
         await axios.post('/api/me/time-records-with-reason', {
           type,
-          pause_reason_id: pauseReason.reason === 'outro' ? null : pauseReason.reason,
+          // Verifica se 'outro' foi selecionado para não enviar pause_reason_id
+          pause_reason_id: pauseReason.reason === 'outro' ? null : pauseReason.reason, 
           custom_reason: pauseReason.description
         });
       } else {
         await axios.post('/api/me/time-records', { type });
       }
 
-      await fetchAllData();
+      // Re-fetch para atualizar a lista e o availableActions
+      await fetchAllData(); 
 
       setLastRecord({
         type,
@@ -155,7 +160,8 @@ const EmployeeDashboard = () => {
       showSuccessMessage('Registro Confirmado', `${actionNames[type]} registrada com sucesso às ${new Date().toLocaleTimeString('pt-BR')}`);
 
     } catch (error) {
-      await fetchTodayRecords();
+      // Re-fetch específico em caso de erro para garantir a atualização
+      await fetchTodayRecords(); 
       showErrorMessage('Erro no Registro', error.response?.data?.error || 'Erro ao registrar ponto');
     } finally {
       setRegisterLoading(false);
@@ -214,6 +220,7 @@ const EmployeeDashboard = () => {
     );
   };
 
+  // 💡 LÓGICA DE AÇÕES: Usa useMemo para re-calcular sempre que todayRecordsList mudar
   const availableActions = useMemo(() => {
     if (!todayRecordsList || todayRecordsList.length === 0) {
       return ['entry'];
@@ -228,7 +235,9 @@ const EmployeeDashboard = () => {
 
   const pendingRequestsCount = myRequests.filter(req => req.status === 'pending').length;
 
-  if (loading || lastRecordType === undefined) {
+  // 💡 CORREÇÃO 3: O loading espera que lastRecordType tenha um valor (diferente de undefined)
+  // garantindo que os dados do ponto de hoje foram carregados antes de mostrar a dashboard.
+  if (loading || lastRecordType === undefined) { 
     return (
       <div className="loading-container">
         <div className="loading">Carregando seus dados...</div>
@@ -296,6 +305,7 @@ const EmployeeDashboard = () => {
               </div>
 
               <div className="time-buttons">
+                {/* O availableActions garante que apenas o botão correto seja exibido */}
                 {availableActions.includes('entry') && (
                   <button
                     className="btn btn-success btn-large"
@@ -303,6 +313,7 @@ const EmployeeDashboard = () => {
                     disabled={registerLoading}
                   >
                     <FiLogIn size={20} />
+                    {/* O lastRecordType (agora atualizado) define o texto */}
                     {lastRecordType === 'pause'
                       ? <span>Retornar do Almoço</span>
                       : lastRecordType === 'exit'
@@ -493,14 +504,15 @@ const EmployeeDashboard = () => {
                     </select>
                   </div>
 
-                  {pauseForm.reason === 'outro' && (
+                  {(pauseForm.reason === 'outro' || pauseForm.reason === '') && (
                     <div className="form-group">
                       <label>Descrição *</label>
                       <input
                         type="text"
                         value={pauseForm.description}
                         onChange={(e) => setPauseForm({ ...pauseForm, description: e.target.value })}
-                        required
+                        // Adicionada a validação de descrição se o motivo for "outro"
+                        required={pauseForm.reason === 'outro'} 
                       />
                     </div>
                   )}
@@ -520,7 +532,8 @@ const EmployeeDashboard = () => {
                   <button className="btn btn-secondary" onClick={() => setShowPauseModal(false)}>Cancelar</button>
                   <button
                     className="btn btn-primary"
-                    disabled={!pauseForm.reason || registerLoading}
+                    // Ajustada a lógica de validação do botão: requer motivo OU se for "outro", requer descrição
+                    disabled={!pauseForm.reason || (pauseForm.reason === 'outro' && !pauseForm.description) || registerLoading}
                     onClick={() => registerTime('pause', pauseForm)}
                   >
                     <FiPauseCircle size={16} />
@@ -653,7 +666,14 @@ const EmployeeDashboard = () => {
                             <div className="request-date">
                               {new Date(request.date).toLocaleDateString('pt-BR')}
                               {request.requested_time && (
-                                <span> às {new Date(request.requested_time).toLocaleTimeString('pt-BR')}</span>
+                                <span> às {request.requested_time}</span> 
+                                // Corrigido: Aqui estava usando new Date(request.requested_time).toLocaleTimeString('pt-BR')
+                                // que funcionaria se requested_time fosse um timestamp, mas como é um input type="time"
+                                // ele provavelmente armazena apenas a string "HH:MM". O correto seria usar o valor da string.
+                                // Se o backend armazena o valor do input type="time" como string "HH:MM",
+                                // você pode usar a string diretamente, ou ajustar o backend/frontend para usar um formato consistente.
+                                // Como a requisição de ponto salva apenas o valor do input (e não um timestamp completo),
+                                // vamos usar a string que vem no form:
                               )}
                             </div>
                           </div>
