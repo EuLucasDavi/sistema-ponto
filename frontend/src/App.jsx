@@ -1,5 +1,4 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
@@ -13,11 +12,6 @@ import Layout from './components/Layout';
 import Requests from './components/Requests';
 import PauseReasons from './components/PauseReasons';
 import './App.css';
-
-// Componente para lidar com rotas não encontradas
-const NotFoundRedirect = () => {
-  return <Navigate to="/" replace />;
-};
 
 function ProtectedRoute({ children, requireAdmin = false }) {
   const { user, loading } = useAuth();
@@ -48,7 +42,6 @@ function ProtectedRoute({ children, requireAdmin = false }) {
 }
 
 function App() {
-  const { user } = useAuth();
   return (
     <AuthProvider>
       <Router>
