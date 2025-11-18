@@ -7,15 +7,11 @@ import { MongoClient, ObjectId } from 'mongodb';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 
-// CONFIGURAR FUSO HORÁRIO DO BRASIL
 process.env.TZ = 'America/Sao_Paulo';
-
-// Configurar dotenv primeiro
 dotenv.config();
 
 const app = express();
 
-// CORS - Permitir tudo para teste
 app.use(cors({
   origin: [
     'http://localhost:5173',
@@ -30,7 +26,6 @@ app.use(cors({
 
 app.use(express.json());
 
-// Conexão com MongoDB
 let db;
 let mongoClient;
 
@@ -77,7 +72,6 @@ const createDefaultAdmin = async () => {
       console.log('👤 Usuário admin já existe');
     }
 
-    // Criar justificativas padrão
     await createDefaultPauseReasons();
   } catch (error) {
     console.error('❌ Erro ao criar admin:', error);
@@ -87,14 +81,12 @@ const createDefaultAdmin = async () => {
 const connectToMongoDB = async () => {
   try {
     console.log('🔗 Conectando ao MongoDB...');
-    console.log('📡 MongoDB URI:', process.env.MONGODB_URI ? '✅ Configurada' : '❌ Não configurada');
     
     mongoClient = new MongoClient(process.env.MONGODB_URI);
     await mongoClient.connect();
     db = mongoClient.db('sistema_ponto');
     console.log('✅ Conectado ao MongoDB Atlas com sucesso!');
     
-    // Criar índices
     await db.collection('users').createIndex({ username: 1 }, { unique: true });
     await db.collection('employees').createIndex({ email: 1 }, { unique: true });
     await db.collection('time_records').createIndex({ employee_id: 1, timestamp: 1 });
@@ -102,17 +94,12 @@ const connectToMongoDB = async () => {
     await db.collection('requests').createIndex({ employee_id: 1, created_at: -1 });
     await db.collection('requests').createIndex({ status: 1 });
     
-    // Criar usuário admin padrão e justificativas
     await createDefaultAdmin();
   } catch (error) {
     console.error('❌ Erro ao conectar com MongoDB:', error.message);
-    console.error('💡 Dica: Verifique a string de conexão no Render');
   }
 };
 
-// ==================== MIDDLEWARES ====================
-
-// Middleware de autenticação
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -130,7 +117,6 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Middleware de autorização para admin
 const requireAdmin = (req, res, next) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Acesso restrito a administradores' });
@@ -138,7 +124,6 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// Middleware de autorização para funcionários
 const requireEmployee = (req, res, next) => {
   if (req.user.role !== 'employee' && req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Acesso restrito' });
@@ -146,9 +131,6 @@ const requireEmployee = (req, res, next) => {
   next();
 };
 
-// ==================== ROTAS PÚBLICAS ====================
-
-// Health check melhorado
 app.get('/health', async (req, res) => {
   try {
     let dbStatus = 'Disconnected';
@@ -181,12 +163,10 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Rota raiz - Redireciona para health
 app.get('/', (req, res) => {
   res.redirect('/health');
 });
 
-// Rota simples para testar se a API está respondendo
 app.get('/api/test', (req, res) => {
   res.json({ 
     message: 'API está funcionando!',
@@ -194,7 +174,6 @@ app.get('/api/test', (req, res) => {
   });
 });
 
-// ==================== ROTAS DE AUTENTICAÇÃO ====================
 app.post('/api/login', async (req, res) => {
   console.log('🔐 Recebida requisição de login');
   
@@ -205,7 +184,6 @@ app.post('/api/login', async (req, res) => {
   }
 
   try {
-    // Verificar se o MongoDB está conectado
     if (!db) {
       return res.status(500).json({ error: 'Database não conectado' });
     }
@@ -247,25 +225,19 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// ==================== ROTAS DE USUÁRIOS ====================
-
-// Criar novo usuário (apenas admin)
 app.post('/api/register', authenticateToken, requireAdmin, async (req, res) => {
   const { username, password, employee_id, role } = req.body;
 
   try {
-    // Verificar se username já existe
     const existingUser = await db.collection('users').findOne({ username });
     if (existingUser) {
       return res.status(400).json({ error: 'Usuário já existe' });
     }
 
-    // Verificar se employee_id é válido
     if (employee_id && !ObjectId.isValid(employee_id)) {
       return res.status(400).json({ error: 'ID do funcionário inválido' });
     }
 
-    // Verificar se funcionário existe
     if (employee_id) {
       const employee = await db.collection('employees').findOne({ 
         _id: new ObjectId(employee_id) 
@@ -288,7 +260,6 @@ app.post('/api/register', authenticateToken, requireAdmin, async (req, res) => {
     const result = await db.collection('users').insertOne(userData);
     const newUser = await db.collection('users').findOne({ _id: result.insertedId });
 
-    // Remover password da resposta
     delete newUser.password;
 
     res.status(201).json(newUser);
@@ -298,17 +269,15 @@ app.post('/api/register', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-// Listar usuários (apenas admin)
 app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     console.log('👥 Buscando lista de usuários...');
     
     const users = await db.collection('users')
-      .find({}, { projection: { password: 0 } }) // Excluir password
+      .find({}, { projection: { password: 0 } })
       .sort({ username: 1 })
       .toArray();
     
-    // Buscar dados dos funcionários vinculados
     const usersWithEmployees = await Promise.all(
       users.map(async (user) => {
         let employee = null;
@@ -332,7 +301,6 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-// Editar usuário (apenas admin)
 app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { username, employee_id, role, password } = req.body;
@@ -340,7 +308,6 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     console.log('✏️ Editando usuário:', id);
     
-    // Verificar se o usuário existe
     const existingUser = await db.collection('users').findOne({ 
       _id: new ObjectId(id) 
     });
@@ -349,7 +316,6 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
-    // Verificar se username já existe (excluindo o próprio usuário)
     if (username && username !== existingUser.username) {
       const userWithSameUsername = await db.collection('users').findOne({ 
         username, 
@@ -361,12 +327,10 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
       }
     }
 
-    // Verificar se employee_id é válido
     if (employee_id && !ObjectId.isValid(employee_id)) {
       return res.status(400).json({ error: 'ID do funcionário inválido' });
     }
 
-    // Verificar se funcionário existe
     if (employee_id) {
       const employee = await db.collection('employees').findOne({ 
         _id: new ObjectId(employee_id) 
@@ -376,7 +340,6 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
       }
     }
 
-    // Preparar dados para atualização
     const updateData = {
       updated_at: new Date()
     };
@@ -385,12 +348,10 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
     if (employee_id) updateData.employee_id = new ObjectId(employee_id);
     if (role) updateData.role = role;
     
-    // Atualizar senha se fornecida
     if (password) {
       updateData.password = await bcrypt.hash(password, 10);
     }
 
-    // Se employee_id for null, remover o vínculo
     if (employee_id === null) {
       updateData.employee_id = null;
     }
@@ -404,13 +365,11 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
-    // Buscar usuário atualizado
     const updatedUser = await db.collection('users').findOne(
       { _id: new ObjectId(id) },
       { projection: { password: 0 } }
     );
 
-    // Buscar dados do funcionário vinculado
     let employee = null;
     if (updatedUser.employee_id) {
       employee = await db.collection('employees').findOne({ 
@@ -429,14 +388,12 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-// Excluir usuário (apenas admin)
 app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
     console.log('🗑️ Excluindo usuário:', id);
     
-    // Verificar se é o próprio usuário admin
     const userToDelete = await db.collection('users').findOne({ 
       _id: new ObjectId(id) 
     });
@@ -445,7 +402,6 @@ app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) =
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
-    // Impedir que o admin principal seja excluído
     if (userToDelete.username === 'admin') {
       return res.status(400).json({ error: 'Não é possível excluir o usuário admin principal' });
     }
@@ -466,7 +422,6 @@ app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) =
   }
 });
 
-// Desvincular funcionário de usuário (apenas admin)
 app.put('/api/users/:id/unlink-employee', authenticateToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
 
@@ -487,7 +442,6 @@ app.put('/api/users/:id/unlink-employee', authenticateToken, requireAdmin, async
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
-    // Buscar usuário atualizado
     const updatedUser = await db.collection('users').findOne(
       { _id: new ObjectId(id) },
       { projection: { password: 0 } }
@@ -501,11 +455,9 @@ app.put('/api/users/:id/unlink-employee', authenticateToken, requireAdmin, async
   }
 });
 
-// ==================== ROTAS DE FUNCIONÁRIOS (APENAS ADMIN) ====================
 app.get('/api/employees', authenticateToken, async (req, res) => {
   try {
     console.log('👥 Buscando lista de funcionários...');
-    console.log('👤 Usuário:', req.user.username, 'Role:', req.user.role);
     
     const employees = await db.collection('employees')
       .find()
@@ -595,9 +547,6 @@ app.delete('/api/employees/:id', authenticateToken, requireAdmin, async (req, re
   }
 });
 
-// ==================== ROTAS PESSOAIS DO FUNCIONÁRIO ====================
-
-// Funcionário ver seus próprios registros de ponto
 app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
   try {
     const user = await db.collection('users').findOne({ 
@@ -622,7 +571,7 @@ app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, 
     const records = await db.collection('time_records')
       .find(query)
       .sort({ timestamp: -1 })
-      .limit(100) // Limitar para não sobrecarregar
+      .limit(100)
       .toArray();
 
     res.json(records);
@@ -631,7 +580,6 @@ app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, 
   }
 });
 
-// Funcionário registrar seu próprio ponto (sem justificativa)
 app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
   const { type } = req.body;
   const timestamp = new Date();
@@ -645,12 +593,10 @@ app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req,
       return res.status(400).json({ error: 'Funcionário não vinculado' });
     }
 
-    // Validar o tipo de registro
     if (!['entry', 'pause', 'exit'].includes(type)) {
       return res.status(400).json({ error: 'Tipo de registro inválido. Use: entry, pause ou exit' });
     }
 
-    // Buscar o último registro do funcionário hoje
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -662,28 +608,19 @@ app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req,
         sort: { timestamp: -1 }
       });
 
-    // NOVA LÓGICA CORRIGIDA - Não permitir pausas consecutivas
     if (type === 'entry') {
-      // Pode dar entrada se:
-      // - Não há registros hoje (primeiro registro)
-      // - Último registro foi saída (novo turno)
-      // - Último registro foi pausa (retorno do almoço)
       if (lastRecord && lastRecord.type === 'entry') {
         return res.status(400).json({ 
           error: 'Entrada já registrada. Registre uma pausa ou saída primeiro.' 
         });
       }
     } else if (type === 'pause') {
-      // Pode pausar APENAS se a última ação foi entrada (não pode pausar após outra pausa)
       if (!lastRecord || lastRecord.type !== 'entry') {
         return res.status(400).json({ 
           error: 'Você precisa registrar uma entrada antes de pausar.' 
         });
       }
     } else if (type === 'exit') {
-      // Pode sair se:
-      // - Último registro foi entrada (sem pausa)
-      // - Último registro foi pausa (saída após pausa)
       if (!lastRecord || (lastRecord.type !== 'entry' && lastRecord.type !== 'pause')) {
         return res.status(400).json({ 
           error: 'Registro de entrada não encontrado para hoje.' 
@@ -700,7 +637,6 @@ app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req,
 
     const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
     
-    // Buscar dados do funcionário para a resposta
     const employee = await db.collection('employees').findOne({ 
       _id: user.employee_id 
     });
@@ -714,11 +650,9 @@ app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req,
   }
 });
 
-// ==================== DASHBOARD (ADAPTADO POR ROLE) ====================
 app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
   try {
     if (req.user.role === 'admin') {
-      // Stats para admin
       const totalEmployees = await db.collection('employees').countDocuments();
       
       const today = new Date();
@@ -742,7 +676,6 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         recentEmployees
       });
     } else {
-      // Stats para funcionário
       const user = await db.collection('users').findOne({ 
         _id: new ObjectId(req.user.id) 
       });
@@ -789,507 +722,6 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
   }
 });
 
-// ==================== RELATÓRIOS PDF - ESPELHO DE PONTO FORMATADO ====================
-app.get('/api/reports/timesheet/:employee_id/pdf', authenticateToken, requireAdmin, async (req, res) => {
-  const { employee_id } = req.params;
-  const { start_date, end_date } = req.query;
-
-  console.log('📊 Gerando PDF para funcionário:', employee_id);
-  console.log('📅 Período:', start_date, 'até', end_date);
-
-  try {
-    if (!ObjectId.isValid(employee_id)) {
-      return res.status(400).json({ error: 'ID do funcionário inválido' });
-    }
-
-    const employee = await db.collection('employees').findOne({ 
-      _id: new ObjectId(employee_id) 
-    });
-    
-    if (!employee) {
-      return res.status(404).json({ error: 'Funcionário não encontrado' });
-    }
-
-    // Buscar registros ordenados por data
-    const records = await db.collection('time_records')
-      .find({
-        employee_id: new ObjectId(employee_id),
-        timestamp: {
-          $gte: new Date(start_date),
-          $lte: new Date(end_date + 'T23:59:59.999Z')
-        }
-      })
-      .sort({ timestamp: 1 })
-      .toArray();
-
-    console.log(`📈 Encontrados ${records.length} registros`);
-
-    // Agrupar registros por dia
-    const recordsByDay = {};
-    records.forEach(record => {
-      const dateKey = new Date(record.timestamp).toISOString().split('T')[0];
-      if (!recordsByDay[dateKey]) {
-        recordsByDay[dateKey] = [];
-      }
-      recordsByDay[dateKey].push(record);
-    });
-
-    // Criar PDF
-    const doc = new PDFDocument({ margin: 50 });
-    
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=espelho-ponto-${employee.name.replace(/\s+/g, '_')}.pdf`);
-
-    doc.pipe(res);
-
-    // Cabeçalho
-    doc.fontSize(16).font('Helvetica-Bold')
-       .text('ESPELHO DE PONTO', { align: 'center' });
-    
-    doc.moveDown(0.5);
-    doc.fontSize(10).font('Helvetica')
-       .text(`Funcionário: ${employee.name}`, { align: 'left' })
-       .text(`Matrícula: ${employee._id.toString().substring(18, 24)}`, { align: 'left' })
-       .text(`Departamento: ${employee.department}`, { align: 'left' })
-       .text(`Período: ${new Date(start_date).toLocaleDateString('pt-BR')} à ${new Date(end_date).toLocaleDateString('pt-BR')}`, { align: 'left' })
-       .text(`Data de emissão: ${new Date().toLocaleDateString('pt-BR')}`, { align: 'left' });
-
-    doc.moveDown(1);
-
-    // Tabela de registros
-    let yPosition = doc.y;
-    const pageWidth = doc.page.width - 100;
-    const colWidth = pageWidth / 6;
-
-    // Cabeçalho da tabela
-    const pageWidthNew = doc.page.width - 100;
-    const colWidthNew = pageWidthNew / 8;
-    
-    doc.fontSize(8).font('Helvetica-Bold');
-    doc.text('DATA', 50, yPosition);
-    doc.text('DIA', 50 + colWidthNew, yPosition);
-    doc.text('ENTRADA', 50 + colWidthNew * 2, yPosition);
-    doc.text('PAUSA', 50 + colWidthNew * 3, yPosition);
-    doc.text('RETORNO', 50 + colWidthNew * 4, yPosition);
-    doc.text('SAÍDA', 50 + colWidthNew * 5, yPosition);
-    doc.text('TOTAL', 50 + colWidthNew * 6, yPosition);
-    doc.text('H. EXTRA', 50 + colWidthNew * 7, yPosition);
-    
-    yPosition += 15;
-    doc.moveTo(50, yPosition).lineTo(50 + pageWidthNew, yPosition).stroke();
-    yPosition += 10;
-
-    // Linhas da tabela
-    doc.fontSize(7).font('Helvetica');
-    
-    let totalHorasNormais = 0;
-    let totalHorasExtras = 0;
-    const diasUteis = Object.keys(recordsByDay).length;
-
-    Object.keys(recordsByDay).sort().forEach(dateKey => {
-      const dayRecords = recordsByDay[dateKey];
-      const date = new Date(dateKey);
-      const dayName = date.toLocaleDateString('pt-BR', { weekday: 'long' });
-      
-      // Encontrar entrada, pausa e saída do dia
-      const entradas = dayRecords.filter(r => r.type === 'entry');
-      const pausas = dayRecords.filter(r => r.type === 'pause');
-      const saida = dayRecords.find(r => r.type === 'exit');
-
-      if (yPosition > 650) {
-        doc.addPage();
-        yPosition = 50;
-        
-        // Cabeçalho na nova página
-        doc.fontSize(8).font('Helvetica-Bold');
-        doc.text('DATA', 50, yPosition);
-        doc.text('DIA', 50 + colWidthNew, yPosition);
-        doc.text('ENTRADA', 50 + colWidthNew * 2, yPosition);
-        doc.text('PAUSA', 50 + colWidthNew * 3, yPosition);
-        doc.text('RETORNO', 50 + colWidthNew * 4, yPosition);
-        doc.text('SAÍDA', 50 + colWidthNew * 5, yPosition);
-        doc.text('TOTAL', 50 + colWidthNew * 6, yPosition);
-        doc.text('H. EXTRA', 50 + colWidthNew * 7, yPosition);
-        
-        yPosition += 15;
-        doc.moveTo(50, yPosition).lineTo(50 + pageWidthNew, yPosition).stroke();
-        yPosition += 10;
-        doc.fontSize(7).font('Helvetica');
-      }
-
-      // Data
-      doc.text(date.toLocaleDateString('pt-BR'), 50, yPosition);
-      
-      // Dia da semana
-      const dayShort = dayName.substring(0, 3);
-      doc.text(dayShort.charAt(0).toUpperCase() + dayShort.slice(1), 50 + colWidthNew, yPosition);
-      
-      // Primeira entrada
-      const primeiraEntrada = entradas[0];
-      if (primeiraEntrada) {
-        doc.text(new Date(primeiraEntrada.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}), 50 + colWidthNew * 2, yPosition);
-      } else {
-        doc.text('--:--', 50 + colWidthNew * 2, yPosition);
-      }
-      
-      // Pausa
-      const pausa = pausas[0];
-      if (pausa) {
-        doc.text(new Date(pausa.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}), 50 + colWidthNew * 3, yPosition);
-      } else {
-        doc.text('--:--', 50 + colWidthNew * 3, yPosition);
-      }
-      
-      // Retorno (segunda entrada)
-      const retorno = entradas[1];
-      if (retorno) {
-        doc.text(new Date(retorno.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}), 50 + colWidthNew * 4, yPosition);
-      } else {
-        doc.text('--:--', 50 + colWidthNew * 4, yPosition);
-      }
-      
-      // Saída
-      if (saida) {
-        doc.text(new Date(saida.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}), 50 + colWidthNew * 5, yPosition);
-      } else {
-        doc.text('--:--', 50 + colWidthNew * 5, yPosition);
-      }
-      
-      // Cálculo de horas trabalhadas: (saída - primeira entrada) - (retorno - pausa)
-      let horasTrabalhadas = '--:--';
-      let horasExtras = '--:--';
-      
-      if (primeiraEntrada && saida) {
-        // Tempo total (saída - primeira entrada)
-        let diffMs = new Date(saida.timestamp) - new Date(primeiraEntrada.timestamp);
-        
-        // Subtrair tempo de pausa se houver pausa e retorno
-        if (pausa && retorno) {
-          const pausaMs = new Date(retorno.timestamp) - new Date(pausa.timestamp);
-          diffMs -= pausaMs;
-        }
-        
-        const diffHours = diffMs / (1000 * 60 * 60);
-        
-        const horas = Math.floor(diffHours);
-        const minutos = Math.floor((diffHours - horas) * 60);
-        horasTrabalhadas = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
-        
-        // Calcular horas extras (acima de 8 horas)
-        if (diffHours > 8) {
-          const extraHours = diffHours - 8;
-          const extraHoras = Math.floor(extraHours);
-          const extraMinutos = Math.floor((extraHours - extraHoras) * 60);
-          horasExtras = `${extraHoras.toString().padStart(2, '0')}:${extraMinutos.toString().padStart(2, '0')}`;
-          totalHorasExtras += extraHours;
-        } else {
-          horasExtras = '00:00';
-        }
-        
-        totalHorasNormais += Math.min(diffHours, 8);
-      }
-      
-      doc.text(horasTrabalhadas, 50 + colWidthNew * 6, yPosition);
-      doc.text(horasExtras, 50 + colWidthNew * 7, yPosition);
-      
-      yPosition += 12;
-    });
-
-    // Resumo
-    yPosition += 20;
-    doc.fontSize(9).font('Helvetica-Bold')
-       .text('RESUMO DO PERÍODO', 50, yPosition);
-    
-    yPosition += 15;
-    doc.fontSize(8).font('Helvetica')
-       .text(`Total de dias úteis: ${diasUteis}`, 50, yPosition)
-       .text(`Horas normais: ${Math.floor(totalHorasNormais)}h ${Math.floor((totalHorasNormais - Math.floor(totalHorasNormais)) * 60)}min`, 50, yPosition + 12)
-       .text(`Horas extras: ${Math.floor(totalHorasExtras)}h ${Math.floor((totalHorasExtras - Math.floor(totalHorasExtras)) * 60)}min`, 50, yPosition + 24)
-       .text(`Salário base: R$ ${employee.salary.toFixed(2)}`, 50, yPosition + 36);
-
-    // Assinaturas
-    const assinaturaY = doc.page.height - 100;
-    doc.moveTo(50, assinaturaY).lineTo(250, assinaturaY).stroke();
-    doc.moveTo(300, assinaturaY).lineTo(500, assinaturaY).stroke();
-    
-    doc.text('Assinatura do Funcionário', 100, assinaturaY + 10);
-    doc.text('Assinatura do Responsável', 350, assinaturaY + 10);
-
-    doc.end();
-    
-  } catch (error) {
-    console.error('❌ Erro ao gerar PDF:', error);
-    res.status(500).json({ error: 'Erro ao gerar PDF: ' + error.message });
-  }
-});
-
-// ==================== RELATÓRIOS EXCEL - FOLHA DE PAGAMENTO COMPLETA ====================
-app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (req, res) => {
-  const { month, year } = req.query;
-
-  console.log('💰 Gerando Excel - Mês:', month, 'Ano:', year);
-
-  try {
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-
-    // Buscar todos os funcionários
-    const employees = await db.collection('employees').find().toArray();
-    console.log(`👥 ${employees.length} funcionários encontrados`);
-
-    // Para cada funcionário, calcular dados de ponto
-    const payrollData = await Promise.all(
-      employees.map(async (employee) => {
-        // Buscar todos os registros do mês
-        const records = await db.collection('time_records')
-          .find({
-            employee_id: employee._id,
-            timestamp: { $gte: startDate, $lte: endDate }
-          })
-          .sort({ timestamp: 1 })
-          .toArray();
-
-        // Agrupar registros por dia
-        const recordsByDay = {};
-        records.forEach(record => {
-          const dateKey = new Date(record.timestamp).toISOString().split('T')[0];
-          if (!recordsByDay[dateKey]) {
-            recordsByDay[dateKey] = [];
-          }
-          recordsByDay[dateKey].push(record);
-        });
-
-        // Calcular totais
-        let totalHorasNormais = 0;
-        let totalHorasExtras = 0;
-        let diasTrabalhados = 0;
-
-        Object.keys(recordsByDay).forEach(dateKey => {
-          const dayRecords = recordsByDay[dateKey];
-          const entradas = dayRecords.filter(r => r.type === 'entry');
-          const pausas = dayRecords.filter(r => r.type === 'pause');
-          const saida = dayRecords.find(r => r.type === 'exit');
-
-          const primeiraEntrada = entradas[0];
-          const retorno = entradas[1];
-          const pausa = pausas[0];
-
-          if (primeiraEntrada && saida) {
-            // Tempo total (saída - primeira entrada)
-            let diffMs = new Date(saida.timestamp) - new Date(primeiraEntrada.timestamp);
-            
-            // Subtrair tempo de pausa se houver pausa e retorno
-            if (pausa && retorno) {
-              const pausaMs = new Date(retorno.timestamp) - new Date(pausa.timestamp);
-              diffMs -= pausaMs;
-            }
-            
-            const diffHours = diffMs / (1000 * 60 * 60);
-            
-            totalHorasNormais += Math.min(diffHours, 8);
-            if (diffHours > 8) {
-              totalHorasExtras += diffHours - 8;
-            }
-            diasTrabalhados++;
-          }
-        });
-
-        // Calcular salários
-        const valorHoraNormal = employee.salary / 30 / 8; // Salário por hora
-        const valorHoraExtra = valorHoraNormal * 1.5; // Hora extra com 50% de acréscimo
-        
-        const salarioNormal = valorHoraNormal * totalHorasNormais;
-        const salarioExtra = valorHoraExtra * totalHorasExtras;
-        const salarioTotal = salarioNormal + salarioExtra;
-
-        return {
-          nome: employee.name,
-          data_admissao: new Date(employee.hire_date),
-          dias_trabalhados: diasTrabalhados,
-          horas_normais: totalHorasNormais,
-          horas_extras: totalHorasExtras,
-          salario_base: employee.salary,
-          salario_normal: salarioNormal,
-          salario_extra: salarioExtra,
-          salario_total: salarioTotal,
-          registros: records
-        };
-      })
-    );
-
-    // Criar Excel
-    const workbook = new ExcelJS.Workbook();
-    
-    // Planilha principal - Folha de Pagamento
-    const worksheet = workbook.addWorksheet('Folha de Pagamento');
-
-    // Cabeçalhos
-    worksheet.columns = [
-      { header: 'Funcionário', key: 'nome', width: 25 },
-      { header: 'Data Admissão', key: 'data_admissao', width: 15 },
-      { header: 'Dias Trabalhados', key: 'dias_trabalhados', width: 15 },
-      { header: 'Horas Normais', key: 'horas_normais', width: 15 },
-      { header: 'Horas Extras', key: 'horas_extras', width: 15 },
-      { header: 'Salário Base', key: 'salario_base', width: 15 },
-      { header: 'Salário Normal', key: 'salario_normal', width: 15 },
-      { header: 'Hora Extra', key: 'salario_extra', width: 15 },
-      { header: 'Salário Total', key: 'salario_total', width: 15 }
-    ];
-    
-    // Adicionar dados na planilha principal
-    payrollData.forEach(emp => {
-      worksheet.addRow({
-        nome: emp.nome,
-        data_admissao: emp.data_admissao,
-        dias_trabalhados: emp.dias_trabalhados,
-        horas_normais: Math.round(emp.horas_normais * 100) / 100,
-        horas_extras: Math.round(emp.horas_extras * 100) / 100,
-        salario_base: emp.salario_base,
-        salario_normal: Math.round(emp.salario_normal * 100) / 100,
-        salario_extra: Math.round(emp.salario_extra * 100) / 100,
-        salario_total: Math.round(emp.salario_total * 100) / 100
-      });
-    });
-
-    // Formatar números na planilha principal
-    [5, 6, 7, 8].forEach(colIndex => {
-      worksheet.getColumn(colIndex).numFmt = '"R$"#,##0.00';
-    });
-
-    [3, 4].forEach(colIndex => {
-      worksheet.getColumn(colIndex).numFmt = '0.00"h"';
-    });
-
-    // Formatar data
-    worksheet.getColumn(2).numFmt = 'dd/mm/yyyy';
-
-    // Formatar cabeçalhos
-    const headerRow = worksheet.getRow(1);
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF2E86AB' }
-    };
-    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
-
-    // Adicionar totais
-    if (payrollData.length > 0) {
-      const totalRow = payrollData.length + 3;
-      
-      worksheet.mergeCells(`A${totalRow}:E${totalRow}`);
-      worksheet.getCell(`A${totalRow}`).value = 'TOTAIS:';
-      worksheet.getCell(`A${totalRow}`).font = { bold: true };
-      worksheet.getCell(`A${totalRow}`).alignment = { horizontal: 'right' };
-      
-      // Fórmulas para totais
-      worksheet.getCell(`F${totalRow}`).value = { formula: `SUM(F2:F${payrollData.length + 1})` };
-      worksheet.getCell(`G${totalRow}`).value = { formula: `SUM(G2:G${payrollData.length + 1})` };
-      worksheet.getCell(`H${totalRow}`).value = { formula: `SUM(H2:H${payrollData.length + 1})` };
-      worksheet.getCell(`I${totalRow}`).value = { formula: `SUM(I2:I${payrollData.length + 1})` };
-      
-      // Formatar células de totais
-      for (let col = 6; col <= 9; col++) {
-        worksheet.getCell(totalRow, col).font = { bold: true };
-        worksheet.getCell(totalRow, col).fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FFF2F2F2' }
-        };
-      }
-    }
-
-    // Planilha 2 - Detalhes dos Registros
-    const detailsWorksheet = workbook.addWorksheet('Detalhes Registros');
-
-    detailsWorksheet.columns = [
-      { header: 'Funcionário', key: 'funcionario', width: 25 },
-      { header: 'Data', key: 'data', width: 12 },
-      { header: 'Dia', key: 'dia', width: 12 },
-      { header: 'Entrada', key: 'entrada', width: 10 },
-      { header: 'Saída', key: 'saida', width: 10 },
-      { header: 'Total Horas', key: 'total_horas', width: 12 },
-      { header: 'Horas Extras', key: 'horas_extras', width: 12 }
-    ];
-
-    // Adicionar detalhes de todos os registros
-    payrollData.forEach(emp => {
-      const recordsByDay = {};
-      emp.registros.forEach(record => {
-        const dateKey = new Date(record.timestamp).toISOString().split('T')[0];
-        if (!recordsByDay[dateKey]) {
-          recordsByDay[dateKey] = [];
-        }
-        recordsByDay[dateKey].push(record);
-      });
-
-      Object.keys(recordsByDay).sort().forEach(dateKey => {
-        const dayRecords = recordsByDay[dateKey];
-        const date = new Date(dateKey);
-        const entrada = dayRecords.find(r => r.type === 'entry');
-        const saida = dayRecords.find(r => r.type === 'exit');
-
-        let totalHoras = '--:--';
-        let horasExtras = '00:00';
-
-        if (entrada && saida) {
-          const diffMs = new Date(saida.timestamp) - new Date(entrada.timestamp);
-          const diffHours = diffMs / (1000 * 60 * 60);
-          
-          const horas = Math.floor(diffHours);
-          const minutos = Math.floor((diffHours - horas) * 60);
-          totalHoras = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
-          
-          if (diffHours > 8) {
-            const extraHours = diffHours - 8;
-            const extraHoras = Math.floor(extraHours);
-            const extraMinutos = Math.floor((extraHours - extraHoras) * 60);
-            horasExtras = `${extraHoras.toString().padStart(2, '0')}:${extraMinutos.toString().padStart(2, '0')}`;
-          }
-        }
-
-        detailsWorksheet.addRow({
-          funcionario: emp.nome,
-          data: date,
-          dia: date.toLocaleDateString('pt-BR', { weekday: 'long' }),
-          entrada: entrada ? new Date(entrada.timestamp).toLocaleTimeString('pt-BR') : '--:--',
-          saida: saida ? new Date(saida.timestamp).toLocaleTimeString('pt-BR') : '--:--',
-          total_horas: totalHoras,
-          horas_extras: horasExtras
-        });
-      });
-    });
-
-    // Formatar cabeçalhos da segunda planilha
-    const detailsHeader = detailsWorksheet.getRow(1);
-    detailsHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    detailsHeader.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF28A745' }
-    };
-    detailsHeader.alignment = { vertical: 'middle', horizontal: 'center' };
-
-    // Formatar datas
-    detailsWorksheet.getColumn(2).numFmt = 'dd/mm/yyyy';
-
-    // Configurar headers
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=folha-pagamento-${month}-${year}.xlsx`);
-
-    await workbook.xlsx.write(res);
-    res.end();
-    
-    console.log('✅ Excel gerado com sucesso');
-    
-  } catch (error) {
-    console.error('❌ Erro ao gerar Excel:', error);
-    res.status(500).json({ error: 'Erro ao gerar Excel: ' + error.message });
-  }
-});
-
-// ==================== JUSTIFICATIVAS DE PAUSA ====================
-
 app.get('/api/pause-reasons', authenticateToken, async (req, res) => {
   try {
     const reasons = await db.collection('pause_reasons')
@@ -1324,7 +756,6 @@ app.put('/api/pause-reasons/:id', authenticateToken, requireAdmin, async (req, r
   const { name, description } = req.body;
 
   try {
-    // Verificar se a justificativa existe
     const existingReason = await db.collection('pause_reasons').findOne({ 
       _id: new ObjectId(id) 
     });
@@ -1333,7 +764,6 @@ app.put('/api/pause-reasons/:id', authenticateToken, requireAdmin, async (req, r
       return res.status(404).json({ error: 'Justificativa não encontrada' });
     }
 
-    // Verificar se nome já existe (excluindo a própria justificativa)
     if (name && name !== existingReason.name) {
       const reasonWithSameName = await db.collection('pause_reasons').findOne({ 
         name, 
@@ -1384,22 +814,17 @@ app.delete('/api/pause-reasons/:id', authenticateToken, requireAdmin, async (req
   }
 });
 
-// ==================== SOLICITAÇÕES ====================
-
-// Tipos de solicitação
 const REQUEST_TYPES = {
   ABSENCE: 'absence',
   TIME_RECORD: 'time_record'
 };
 
-// Status das solicitações
 const REQUEST_STATUS = {
   PENDING: 'pending',
   APPROVED: 'approved',
   REJECTED: 'rejected'
 };
 
-// Criar solicitação
 app.post('/api/requests', authenticateToken, async (req, res) => {
   const { type, date, reason, description, requested_time } = req.body;
 
@@ -1412,12 +837,10 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Funcionário não vinculado' });
     }
 
-    // Validar tipo de solicitação
     if (![REQUEST_TYPES.ABSENCE, REQUEST_TYPES.TIME_RECORD].includes(type)) {
       return res.status(400).json({ error: 'Tipo de solicitação inválido' });
     }
 
-    // Para solicitação de ponto, horário é obrigatório
     if (type === REQUEST_TYPES.TIME_RECORD && !requested_time) {
       return res.status(400).json({ error: 'Horário é obrigatório para solicitação de ponto' });
     }
@@ -1437,7 +860,6 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
 
     const newRequest = await db.collection('requests').findOne({ _id: result.insertedId });
     
-    // Buscar dados do funcionário
     const employee = await db.collection('employees').findOne({ 
       _id: user.employee_id 
     });
@@ -1451,7 +873,6 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
   }
 });
 
-// Listar solicitações (admin vê todas, funcionário vê apenas as próprias)
 app.get('/api/requests', authenticateToken, async (req, res) => {
   try {
     let query = {};
@@ -1473,7 +894,6 @@ app.get('/api/requests', authenticateToken, async (req, res) => {
       .sort({ created_at: -1 })
       .toArray();
 
-    // Buscar dados dos funcionários
     const requestsWithEmployees = await Promise.all(
       requests.map(async (request) => {
         const employee = await db.collection('employees').findOne({ 
@@ -1499,7 +919,6 @@ app.get('/api/requests', authenticateToken, async (req, res) => {
   }
 });
 
-// Aprovar/rejeitar solicitação (apenas admin)
 app.put('/api/requests/:id/status', authenticateToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { status, admin_notes } = req.body;
@@ -1525,11 +944,8 @@ app.put('/api/requests/:id/status', authenticateToken, requireAdmin, async (req,
       processed_at: new Date()
     };
 
-    // Se aprovada e for solicitação de ponto, criar o registro automaticamente
     if (status === REQUEST_STATUS.APPROVED && request.type === REQUEST_TYPES.TIME_RECORD) {
-      // Determinar o tipo baseado no horário solicitado
       let recordType = 'entry';
-      // Lógica simples: se for antes das 12h é entrada, depois é saída
       const hour = request.requested_time.getHours();
       if (hour >= 12) {
         recordType = 'exit';
@@ -1555,7 +971,6 @@ app.put('/api/requests/:id/status', authenticateToken, requireAdmin, async (req,
 
     const updatedRequest = await db.collection('requests').findOne({ _id: new ObjectId(id) });
     
-    // Buscar dados adicionais
     const employee = await db.collection('employees').findOne({ _id: request.employee_id });
     const user = await db.collection('users').findOne({ _id: request.user_id });
 
@@ -1568,8 +983,6 @@ app.put('/api/requests/:id/status', authenticateToken, requireAdmin, async (req,
     res.status(500).json({ error: error.message });
   }
 });
-
-// ==================== REGISTRO DE PONTO COM JUSTIFICATIVA ====================
 
 app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee, async (req, res) => {
   const { type, pause_reason_id, custom_reason } = req.body;
@@ -1584,18 +997,15 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
       return res.status(400).json({ error: 'Funcionário não vinculado' });
     }
 
-    // Validar o tipo de registro
     if (!['entry', 'pause', 'exit'].includes(type)) {
       return res.status(400).json({ error: 'Tipo de registro inválido. Use: entry, pause ou exit' });
     }
 
-    // Para pausas, validar justificativa
     if (type === 'pause') {
       if (!pause_reason_id && !custom_reason) {
         return res.status(400).json({ error: 'Justificativa é obrigatória para pausas' });
       }
 
-      // Se foi selecionada uma razão pré-definida, validar se existe
       if (pause_reason_id) {
         const reasonExists = await db.collection('pause_reasons').findOne({ 
           _id: new ObjectId(pause_reason_id) 
@@ -1606,7 +1016,6 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
       }
     }
 
-    // Buscar o último registro do funcionário hoje
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -1618,28 +1027,19 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
         sort: { timestamp: -1 }
       });
 
-    // MESMA LÓGICA CORRIGIDA APLICADA AQUI
     if (type === 'entry') {
-      // Pode dar entrada se:
-      // - Não há registros hoje (primeiro registro)
-      // - Último registro foi saída (novo turno)
-      // - Último registro foi pausa (retorno do almoço)
       if (lastRecord && lastRecord.type === 'entry') {
         return res.status(400).json({ 
           error: 'Entrada já registrada. Registre uma pausa ou saída primeiro.' 
         });
       }
     } else if (type === 'pause') {
-      // Pode pausar APENAS se a última ação foi entrada (não pode pausar após outra pausa)
       if (!lastRecord || lastRecord.type !== 'entry') {
         return res.status(400).json({ 
           error: 'Você precisa registrar uma entrada antes de pausar.' 
         });
       }
     } else if (type === 'exit') {
-      // Pode sair se:
-      // - Último registro foi entrada (sem pausa)
-      // - Último registro foi pausa (saída após pausa)
       if (!lastRecord || (lastRecord.type !== 'entry' && lastRecord.type !== 'pause')) {
         return res.status(400).json({ 
           error: 'Registro de entrada não encontrado para hoje.' 
@@ -1654,7 +1054,6 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
       created_at: new Date()
     };
 
-    // Adicionar dados da justificativa se for pausa
     if (type === 'pause') {
       recordData.pause_reason_id = pause_reason_id ? new ObjectId(pause_reason_id) : null;
       recordData.custom_reason = custom_reason;
@@ -1664,7 +1063,6 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
 
     const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
     
-    // Buscar dados do funcionário e da justificativa se houver
     const employee = await db.collection('employees').findOne({ 
       _id: user.employee_id 
     });
@@ -1686,7 +1084,6 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
   }
 });
 
-// ==================== INICIALIZAÇÃO DO SERVIDOR ====================
 const startServer = async () => {
   try {
     await connectToMongoDB();
@@ -1708,10 +1105,8 @@ const startServer = async () => {
   }
 };
 
-// Iniciar servidor
 startServer();
 
-// Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('🛑 Recebido SIGTERM, encerrando servidor...');
   if (mongoClient) {

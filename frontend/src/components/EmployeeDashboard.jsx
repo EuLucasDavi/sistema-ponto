@@ -27,7 +27,6 @@ const EmployeeDashboard = () => {
   const [recentRecords, setRecentRecords] = useState([]);
   const [todayRecords, setTodayRecords] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [registerLoading, setRegisterLoading] = useState(false);
   const [lastRecord, setLastRecord] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -36,10 +35,8 @@ const EmployeeDashboard = () => {
   const [myRequests, setMyRequests] = useState([]);
   const [pauseReasons, setPauseReasons] = useState([]);
 
-  // Obter usuário atual do contexto de autenticação
   const { user } = useAuth();
 
-  // Estados para os modais
   const [showAbsenceModal, setShowAbsenceModal] = useState(false);
   const [showTimeRecordModal, setShowTimeRecordModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
@@ -48,7 +45,6 @@ const EmployeeDashboard = () => {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [modalContent, setModalContent] = useState({ title: '', message: '' });
 
-  // Estados dos formulários
   const [absenceForm, setAbsenceForm] = useState({
     date: '',
     reason: '',
@@ -67,7 +63,6 @@ const EmployeeDashboard = () => {
     description: ''
   });
 
-  // Resetar estado quando o usuário mudar
   useEffect(() => {
     if (user) {
       resetState();
@@ -75,7 +70,6 @@ const EmployeeDashboard = () => {
     }
   }, [user?.id]);
 
-  // Timer para atualizar hora atual
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -84,27 +78,31 @@ const EmployeeDashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // NOVAS FUNÇÕES: Modais de confirmação
   const showSuccessMessage = (title, message) => {
+    closeAllModals();
     setModalContent({ title, message });
     setShowSuccessModal(true);
   };
 
   const showErrorMessage = (title, message) => {
+    closeAllModals();
     setModalContent({ title, message });
     setShowErrorModal(true);
   };
 
-  const closeModals = () => {
+  const closeAllModals = () => {
     setShowSuccessModal(false);
     setShowErrorModal(false);
+    setShowPauseModal(false);
+    setShowAbsenceModal(false);
+    setShowTimeRecordModal(false);
+    setShowRequestsModal(false);
     setModalContent({ title: '', message: '' });
   };
 
   const fetchAllData = async () => {
     try {
       setLoading(true);
-      setError('');
       
       await Promise.all([
         fetchEmployeeData(),
@@ -128,7 +126,6 @@ const EmployeeDashboard = () => {
     setLastRecordType(null);
     setTodayRecordsList([]);
     setMyRequests([]);
-    setError('');
   };
 
   const fetchEmployeeData = async () => {
@@ -229,10 +226,8 @@ const EmployeeDashboard = () => {
     }
   };
 
-  // ATUALIZADA: Registrar ponto com modais de confirmação
   const registerTime = async (type, pauseReason = null) => {
     setRegisterLoading(true);
-    setError('');
 
     try {
       let response;
@@ -247,7 +242,6 @@ const EmployeeDashboard = () => {
         response = await axios.post('/api/me/time-records', { type });
       }
 
-      // Recarregar TODOS os dados do servidor
       await fetchAllData();
 
       setLastRecord({
@@ -256,13 +250,11 @@ const EmployeeDashboard = () => {
         employee: employeeData?.name
       });
 
-      // Fechar modal de pausa se aplicável
       if (type === 'pause') {
         setShowPauseModal(false);
         setPauseForm({ reason: '', description: '' });
       }
 
-      // MOSTRAR MODAL DE SUCESSO
       const actionNames = {
         'entry': 'Entrada',
         'pause': 'Pausa', 
@@ -277,23 +269,18 @@ const EmployeeDashboard = () => {
     } catch (error) {
       console.error('Erro ao registrar ponto:', error);
       
-      // Recarregar dados mesmo em caso de erro
       await fetchTodayRecords();
       
       const errorMessage = error.response?.data?.error || 'Erro ao registrar ponto';
       
-      // MOSTRAR MODAL DE ERRO
       showErrorMessage('Erro no Registro', errorMessage);
     } finally {
       setRegisterLoading(false);
     }
   };
 
-  // ATUALIZADA: Enviar solicitação com modais
   const submitRequest = async (type, formData) => {
     try {
-      setError('');
-
       const requestData = {
         type,
         date: formData.date,
@@ -304,7 +291,6 @@ const EmployeeDashboard = () => {
 
       await axios.post('/api/requests', requestData);
 
-      // Fechar modal e limpar formulário
       if (type === 'absence') {
         setShowAbsenceModal(false);
         setAbsenceForm({ date: '', reason: '', description: '' });
@@ -313,10 +299,8 @@ const EmployeeDashboard = () => {
         setTimeRecordForm({ date: '', time: '', reason: '', description: '' });
       }
 
-      // Recarregar dados atualizados
       await fetchMyRequests();
 
-      // MOSTRAR MODAL DE SUCESSO
       const requestTypeNames = {
         'absence': 'Ausência',
         'time_record': 'Registro de Ponto'
@@ -332,8 +316,6 @@ const EmployeeDashboard = () => {
       showErrorMessage('Erro na Solicitação', error.response?.data?.error || 'Erro ao enviar solicitação');
     }
   };
-
-  // ... (restante das funções getStatusBadge, getTypeBadge permanecem iguais)
 
   const getStatusBadge = (status) => {
     const statusConfig = {
@@ -389,11 +371,8 @@ const EmployeeDashboard = () => {
         </div>
       </div>
 
-      {/* REMOVIDO: Mensagem de erro no topo - agora usamos modais */}
-
       {employeeData ? (
         <>
-          {/* Grid de Estatísticas (mantido igual) */}
           <div className="stats-grid">
             <div className="stat-card">
               <div className="stat-icon">
@@ -436,7 +415,6 @@ const EmployeeDashboard = () => {
             </div>
           </div>
 
-          {/* Time Clock (mantido igual) */}
           <div className="time-clock-container">
             <div className="time-clock-card">
               <div className="current-time">
@@ -454,7 +432,7 @@ const EmployeeDashboard = () => {
               </div>
 
               <div className="time-buttons">
-                {availableActions.includes('pause') && (
+                {availableActions.includes('entry') && (
                   <button
                     className="btn btn-success btn-large"
                     onClick={() => registerTime('entry')}
@@ -484,7 +462,7 @@ const EmployeeDashboard = () => {
                   </button>
                 )}
 
-                {availableActions.includes('entry') && (
+                {availableActions.includes('pause') && (
                   <button
                     className="btn btn-warning btn-large"
                     onClick={() => setShowPauseModal(true)}
@@ -616,7 +594,6 @@ const EmployeeDashboard = () => {
             </div>
           </div>
 
-          {/* NOVO: Modal de Sucesso */}
           {showSuccessModal && (
             <div className="modal-overlay">
               <div className="modal success-modal">
@@ -625,7 +602,7 @@ const EmployeeDashboard = () => {
                   <h3>{modalContent.title}</h3>
                   <button 
                     className="btn-close-modal" 
-                    onClick={closeModals}
+                    onClick={closeAllModals}
                   >
                     <FiX size={20} />
                   </button>
@@ -638,7 +615,7 @@ const EmployeeDashboard = () => {
                 <div className="modal-footer">
                   <button 
                     className="btn btn-success" 
-                    onClick={closeModals}
+                    onClick={closeAllModals}
                   >
                     <FiCheck size={16} />
                     <span>OK</span>
@@ -648,7 +625,6 @@ const EmployeeDashboard = () => {
             </div>
           )}
 
-          {/* NOVO: Modal de Erro */}
           {showErrorModal && (
             <div className="modal-overlay">
               <div className="modal error-modal">
@@ -657,7 +633,7 @@ const EmployeeDashboard = () => {
                   <h3>{modalContent.title}</h3>
                   <button 
                     className="btn-close-modal" 
-                    onClick={closeModals}
+                    onClick={closeAllModals}
                   >
                     <FiX size={20} />
                   </button>
@@ -670,7 +646,7 @@ const EmployeeDashboard = () => {
                 <div className="modal-footer">
                   <button 
                     className="btn btn-danger" 
-                    onClick={closeModals}
+                    onClick={closeAllModals}
                   >
                     <FiX size={16} />
                     <span>Fechar</span>
@@ -680,7 +656,6 @@ const EmployeeDashboard = () => {
             </div>
           )}
 
-          {/* Modal de Pausa (mantido igual) */}
           {showPauseModal && (
             <div className="modal-overlay">
               <div className="modal">
@@ -765,7 +740,6 @@ const EmployeeDashboard = () => {
             </div>
           )}
 
-          {/* Modal de Solicitação de Ausência (mantido igual) */}
           {showAbsenceModal && (
             <div className="modal-overlay">
               <div className="modal">
@@ -827,7 +801,6 @@ const EmployeeDashboard = () => {
             </div>
           )}
 
-          {/* Modal de Solicitação de Registro de Ponto (mantido igual) */}
           {showTimeRecordModal && (
             <div className="modal-overlay">
               <div className="modal">
@@ -900,7 +873,6 @@ const EmployeeDashboard = () => {
             </div>
           )}
 
-          {/* Modal de Visualização de Solicitações (mantido igual) */}
           {showRequestsModal && (
             <div className="modal-overlay">
               <div className="modal large">
@@ -977,7 +949,6 @@ const EmployeeDashboard = () => {
             </div>
           )}
 
-          {/* Registros Recentes (mantido igual) */}
           <div className="recent-section">
             <div className="section-header">
               <FiClock size={24} />
