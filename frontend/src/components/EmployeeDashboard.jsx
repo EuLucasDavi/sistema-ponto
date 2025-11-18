@@ -15,7 +15,7 @@ const EmployeeDashboard = () => {
   const [pauseReasons, setPauseReasons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [registerLoading, setRegisterLoading] = useState(false);
-  const [lastRecordType, setLastRecordType] = useState(undefined);
+  const [lastRecordType, setLastRecordType] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastRecord, setLastRecord] = useState(null);
 
@@ -49,7 +49,6 @@ const EmployeeDashboard = () => {
     setEmployeeData(null);
     setRecentRecords([]);
     setTodayRecordsList([]);
-    setLastRecordType(undefined);
     setMyRequests([]);
   };
 
@@ -115,13 +114,6 @@ const EmployeeDashboard = () => {
     });
 
     setTodayRecordsList(response.data);
-
-    if (response.data.length > 0) {
-      const lastRecordToday = response.data[response.data.length - 1];
-      setLastRecordType(lastRecordToday.type);
-    } else {
-      setLastRecordType(null);
-    }
   };
 
   const getAvailableActions = () => {
@@ -222,7 +214,18 @@ const EmployeeDashboard = () => {
     );
   };
 
-  const availableActions = getAvailableActions();
+  const availableActions = useMemo(() => {
+    if (!todayRecordsList || todayRecordsList.length === 0) {
+      return ['entry'];
+    }
+
+    const last = todayRecordsList[todayRecordsList.length - 1].type;
+
+    if (last === 'entry') return ['pause', 'exit'];
+    if (last === 'pause') return ['entry'];
+    return ['entry'];
+  }, [todayRecordsList]);
+
   const pendingRequestsCount = myRequests.filter(req => req.status === 'pending').length;
 
   if (loading || lastRecordType === undefined) {
