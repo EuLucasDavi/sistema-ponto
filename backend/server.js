@@ -570,7 +570,7 @@ app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, 
 
     const records = await db.collection('time_records')
       .find(query)
-      .sort({ timestamp: -1 })
+      .sort({ timestamp: 1 })
       .limit(100)
       .toArray();
 
@@ -711,7 +711,7 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         .find({
           employee_id: user.employee_id
         })
-        .sort({ timestamp: -1 })
+        .sort({ timestamp: 1 })
         .limit(5)
         .toArray();
 
