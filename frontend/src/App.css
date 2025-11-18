@@ -2646,3 +2646,97 @@ body {
   color: #888;
   font-weight: 300;
 }
+
+/* Estilos para Modais de Confirmação */
+.success-modal {
+  border-left: 4px solid #28a745;
+}
+
+.error-modal {
+  border-left: 4px solid #dc3545;
+}
+
+.success-header {
+  background: #f8fff9;
+  border-bottom: 1px solid #28a745;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.error-header {
+  background: #fff8f8;
+  border-bottom: 1px solid #dc3545;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.success-icon {
+  color: #28a745;
+}
+
+.error-icon {
+  color: #dc3545;
+}
+
+.success-content {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.error-content {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.success-content p,
+.error-content p {
+  font-size: 16px;
+  line-height: 1.5;
+  color: #333;
+  margin: 0;
+}
+
+/* Animações para os modais */
+.modal {
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Efeito de shake para modais de erro */
+.error-modal {
+  animation: errorShake 0.5s ease-in-out;
+}
+
+@keyframes errorShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .success-modal,
+  .error-modal {
+    margin: 10px;
+    max-width: none;
+  }
+  
+  .success-header,
+  .error-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+}

@@ -44,6 +44,9 @@ const EmployeeDashboard = () => {
   const [showTimeRecordModal, setShowTimeRecordModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
   const [showPauseModal, setShowPauseModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [modalContent, setModalContent] = useState({ title: '', message: '' });
 
   // Estados dos formulários
   const [absenceForm, setAbsenceForm] = useState({
@@ -70,7 +73,7 @@ const EmployeeDashboard = () => {
       resetState();
       fetchAllData();
     }
-  }, [user?.id]); // Recarregar quando o ID do usuário mudar
+  }, [user?.id]);
 
   // Timer para atualizar hora atual
   useEffect(() => {
@@ -81,12 +84,28 @@ const EmployeeDashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // NOVAS FUNÇÕES: Modais de confirmação
+  const showSuccessMessage = (title, message) => {
+    setModalContent({ title, message });
+    setShowSuccessModal(true);
+  };
+
+  const showErrorMessage = (title, message) => {
+    setModalContent({ title, message });
+    setShowErrorModal(true);
+  };
+
+  const closeModals = () => {
+    setShowSuccessModal(false);
+    setShowErrorModal(false);
+    setModalContent({ title: '', message: '' });
+  };
+
   const fetchAllData = async () => {
     try {
       setLoading(true);
       setError('');
       
-      // Fazer todas as requisições em paralelo
       await Promise.all([
         fetchEmployeeData(),
         fetchTodayRecords(),
@@ -95,7 +114,7 @@ const EmployeeDashboard = () => {
       ]);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      setError('Erro ao carregar dados do sistema');
+      showErrorMessage('Erro', 'Erro ao carregar dados do sistema');
     } finally {
       setLoading(false);
     }
@@ -193,25 +212,24 @@ const EmployeeDashboard = () => {
     }
   };
 
-  // Função para determinar ações disponíveis - SEMPRE buscar dados atualizados
   const getAvailableActions = (currentLastRecordType) => {
     if (!currentLastRecordType) {
-      return ['entry']; // Primeiro registro do dia - apenas entrada
+      return ['entry'];
     }
 
     switch (currentLastRecordType) {
       case 'entry':
-        return ['pause', 'exit']; // Após entrada: pode pausar ou sair
+        return ['pause', 'exit'];
       case 'pause':
-        return ['entry']; // Após pausa: pode retornar (nova entrada)
+        return ['entry'];
       case 'exit':
-        return ['entry']; // Após saída: pode iniciar novo turno (entrada)
+        return ['entry'];
       default:
         return ['entry'];
     }
   };
 
-  // Registrar ponto com refresh completo dos dados
+  // ATUALIZADA: Registrar ponto com modais de confirmação
   const registerTime = async (type, pauseReason = null) => {
     setRegisterLoading(true);
     setError('');
@@ -244,22 +262,34 @@ const EmployeeDashboard = () => {
         setPauseForm({ reason: '', description: '' });
       }
 
+      // MOSTRAR MODAL DE SUCESSO
+      const actionNames = {
+        'entry': 'Entrada',
+        'pause': 'Pausa', 
+        'exit': 'Saída'
+      };
+      
+      showSuccessMessage(
+        'Registro Confirmado',
+        `${actionNames[type]} registrada com sucesso às ${new Date().toLocaleTimeString('pt-BR')}`
+      );
+
     } catch (error) {
       console.error('Erro ao registrar ponto:', error);
       
-      // Recarregar dados mesmo em caso de erro (pode ter sido registrado por outro usuário)
+      // Recarregar dados mesmo em caso de erro
       await fetchTodayRecords();
       
       const errorMessage = error.response?.data?.error || 'Erro ao registrar ponto';
-      setError(errorMessage);
       
-      // Mostrar modal de erro
-      alert(errorMessage);
+      // MOSTRAR MODAL DE ERRO
+      showErrorMessage('Erro no Registro', errorMessage);
     } finally {
       setRegisterLoading(false);
     }
   };
 
+  // ATUALIZADA: Enviar solicitação com modais
   const submitRequest = async (type, formData) => {
     try {
       setError('');
@@ -286,15 +316,24 @@ const EmployeeDashboard = () => {
       // Recarregar dados atualizados
       await fetchMyRequests();
 
-      // Mostrar mensagem de sucesso
-      setError('');
-      alert('Solicitação enviada com sucesso! Aguarde a aprovação do administrador.');
+      // MOSTRAR MODAL DE SUCESSO
+      const requestTypeNames = {
+        'absence': 'Ausência',
+        'time_record': 'Registro de Ponto'
+      };
+      
+      showSuccessMessage(
+        'Solicitação Enviada',
+        `Sua solicitação de ${requestTypeNames[type]} foi enviada com sucesso! Aguarde a aprovação do administrador.`
+      );
 
     } catch (error) {
       console.error('Erro ao enviar solicitação:', error);
-      setError(error.response?.data?.error || 'Erro ao enviar solicitação');
+      showErrorMessage('Erro na Solicitação', error.response?.data?.error || 'Erro ao enviar solicitação');
     }
   };
+
+  // ... (restante das funções getStatusBadge, getTypeBadge permanecem iguais)
 
   const getStatusBadge = (status) => {
     const statusConfig = {
@@ -350,16 +389,11 @@ const EmployeeDashboard = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="error-message">
-          <FiAlertCircle size={18} />
-          <span>{error}</span>
-        </div>
-      )}
+      {/* REMOVIDO: Mensagem de erro no topo - agora usamos modais */}
 
       {employeeData ? (
         <>
-          {/* Grid de Estatísticas */}
+          {/* Grid de Estatísticas (mantido igual) */}
           <div className="stats-grid">
             <div className="stat-card">
               <div className="stat-icon">
@@ -388,7 +422,6 @@ const EmployeeDashboard = () => {
               <p>Pontos registrados hoje</p>
             </div>
 
-            {/* Card para solicitações pendentes */}
             <div
               className="stat-card clickable"
               onClick={() => setShowRequestsModal(true)}
@@ -403,7 +436,7 @@ const EmployeeDashboard = () => {
             </div>
           </div>
 
-          {/* Time Clock - ATUALIZADO */}
+          {/* Time Clock (mantido igual) */}
           <div className="time-clock-container">
             <div className="time-clock-card">
               <div className="current-time">
@@ -421,7 +454,6 @@ const EmployeeDashboard = () => {
               </div>
 
               <div className="time-buttons">
-                {/* BOTÕES DINÂMICOS BASEADOS NO ÚLTIMO REGISTRO */}
                 {availableActions.includes('entry') && (
                   <button
                     className="btn btn-success btn-large"
@@ -475,7 +507,6 @@ const EmployeeDashboard = () => {
                 )}
               </div>
 
-              {/* Botões de solicitação */}
               <div className="request-buttons" style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
                 <h4 style={{ marginBottom: '15px', color: '#555' }}>Solicitações</h4>
 
@@ -585,7 +616,71 @@ const EmployeeDashboard = () => {
             </div>
           </div>
 
-          {/* Modal de Pausa - NOVO */}
+          {/* NOVO: Modal de Sucesso */}
+          {showSuccessModal && (
+            <div className="modal-overlay">
+              <div className="modal success-modal">
+                <div className="modal-header success-header">
+                  <FiCheckCircle size={24} className="success-icon" />
+                  <h3>{modalContent.title}</h3>
+                  <button 
+                    className="btn-close-modal" 
+                    onClick={closeModals}
+                  >
+                    <FiX size={20} />
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="success-content">
+                    <p>{modalContent.message}</p>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button 
+                    className="btn btn-success" 
+                    onClick={closeModals}
+                  >
+                    <FiCheck size={16} />
+                    <span>OK</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* NOVO: Modal de Erro */}
+          {showErrorModal && (
+            <div className="modal-overlay">
+              <div className="modal error-modal">
+                <div className="modal-header error-header">
+                  <FiAlertCircle size={24} className="error-icon" />
+                  <h3>{modalContent.title}</h3>
+                  <button 
+                    className="btn-close-modal" 
+                    onClick={closeModals}
+                  >
+                    <FiX size={20} />
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="error-content">
+                    <p>{modalContent.message}</p>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button 
+                    className="btn btn-danger" 
+                    onClick={closeModals}
+                  >
+                    <FiX size={16} />
+                    <span>Fechar</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal de Pausa (mantido igual) */}
           {showPauseModal && (
             <div className="modal-overlay">
               <div className="modal">
@@ -670,7 +765,7 @@ const EmployeeDashboard = () => {
             </div>
           )}
 
-          {/* Modal de Solicitação de Ausência */}
+          {/* Modal de Solicitação de Ausência (mantido igual) */}
           {showAbsenceModal && (
             <div className="modal-overlay">
               <div className="modal">
@@ -732,7 +827,7 @@ const EmployeeDashboard = () => {
             </div>
           )}
 
-          {/* Modal de Solicitação de Registro de Ponto */}
+          {/* Modal de Solicitação de Registro de Ponto (mantido igual) */}
           {showTimeRecordModal && (
             <div className="modal-overlay">
               <div className="modal">
@@ -805,7 +900,7 @@ const EmployeeDashboard = () => {
             </div>
           )}
 
-          {/* Modal de Visualização de Solicitações */}
+          {/* Modal de Visualização de Solicitações (mantido igual) */}
           {showRequestsModal && (
             <div className="modal-overlay">
               <div className="modal large">
@@ -882,7 +977,7 @@ const EmployeeDashboard = () => {
             </div>
           )}
 
-          {/* Registros Recentes */}
+          {/* Registros Recentes (mantido igual) */}
           <div className="recent-section">
             <div className="section-header">
               <FiClock size={24} />

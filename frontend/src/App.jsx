@@ -13,6 +13,11 @@ import Requests from './components/Requests';
 import PauseReasons from './components/PauseReasons';
 import './App.css';
 
+// Componente para lidar com rotas não encontradas
+const NotFoundRedirect = () => {
+  return <Navigate to="/" replace />;
+};
+
 function ProtectedRoute({ children, requireAdmin = false }) {
   const { user, loading } = useAuth();
 
@@ -25,7 +30,7 @@ function ProtectedRoute({ children, requireAdmin = false }) {
   }
 
   if (!user) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" replace />;
   }
 
   if (requireAdmin && user.role !== 'admin') {
@@ -42,83 +47,90 @@ function ProtectedRoute({ children, requireAdmin = false }) {
 }
 
 function App() {
+  const { user } = useAuth();
+
   return (
     <AuthProvider>
       <Router>
         <div className="app">
           <Routes>
+            {/* Rota de login (acesso público) */}
             <Route path="/login" element={<Login />} />
 
-            {/* Rotas para todos os usuários autenticados */}
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Dashboard />
-                </Layout>
-              </ProtectedRoute>
-            } />
-
-            <Route path="/my-time" element={
-              <ProtectedRoute>
-                <Layout>
-                  <EmployeeDashboard />
-                </Layout>
-              </ProtectedRoute>
-            } />
-
-            {/* Rotas apenas para administradores */}
-            <Route path="/employees" element={
-              <ProtectedRoute requireAdmin={true}>
-                <Layout>
-                  <EmployeeManagement />
-                </Layout>
-              </ProtectedRoute>
-            } />
-
-            <Route path="/users" element={
-              <ProtectedRoute requireAdmin={true}>
-                <Layout>
-                  <UserManagement />
-                </Layout>
-              </ProtectedRoute>
-            } />
-
-            <Route path="/reports" element={
-              <ProtectedRoute requireAdmin={true}>
-                <Layout>
-                  <Reports />
-                </Layout>
-              </ProtectedRoute>
-            } />
-
-            <Route path="/time-clock" element={
-              <ProtectedRoute requireAdmin={true}>
-                <Layout>
-                  <TimeClock />
-                </Layout>
-              </ProtectedRoute>
-            } />
-
-            <Route path="/requests" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Requests />
-                </Layout>
-              </ProtectedRoute>
-            } />
-
-            <Route
-              path="/pause-reasons"
+            {/* Layout principal com rotas aninhadas */}
+            <Route 
+              path="/" 
               element={
                 <ProtectedRoute>
-                  <Layout>
-                    <PauseReasons />
-                  </Layout>
+                  <Layout />
                 </ProtectedRoute>
               }
-            />
+            >
+              {/* Rota padrão - dashboard baseado no role */}
+              <Route 
+                index 
+                element={
+                  user?.role === 'admin' ? <Dashboard /> : <EmployeeDashboard />
+                } 
+              />
+              
+              {/* Rota específica para funcionários */}
+              <Route 
+                path="my-time" 
+                element={<EmployeeDashboard />} 
+              />
 
-            <Route path="*" element={<Navigate to="/" />} />
+              {/* Rotas apenas para administradores */}
+              <Route 
+                path="employees" 
+                element={
+                  <ProtectedRoute requireAdmin={true}>
+                    <EmployeeManagement />
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="users" 
+                element={
+                  <ProtectedRoute requireAdmin={true}>
+                    <UserManagement />
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="reports" 
+                element={
+                  <ProtectedRoute requireAdmin={true}>
+                    <Reports />
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="time-clock" 
+                element={
+                  <ProtectedRoute requireAdmin={true}>
+                    <TimeClock />
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Rotas para todos os usuários autenticados */}
+              <Route 
+                path="requests" 
+                element={<Requests />} 
+              />
+
+              <Route 
+                path="pause-reasons" 
+                element={<PauseReasons />} 
+              />
+            </Route>
+
+            {/* Fallback para rotas não encontradas */}
+            <Route path="*" element={<NotFoundRedirect />} />
           </Routes>
         </div>
       </Router>
