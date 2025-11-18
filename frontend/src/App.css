@@ -172,6 +172,7 @@ body {
   background: linear-gradient(135deg, #28a745, #20c997);
   color: white; 
   border: none;
+  animation: infinite;
 }
 .btn-success:hover { 
   background: linear-gradient(135deg, #218838, #1e7e34);
