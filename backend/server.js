@@ -19,7 +19,7 @@ const app = express();
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'https://sistema-ponto-beta.vercel.app',  // Seu frontend na Vercel
+    'https://sistema-ponto-beta.vercel.app',
     'https://sistema-ponto-frontend-*.vercel.app',
     'https://*.vercel.app'
   ],
@@ -84,7 +84,6 @@ const createDefaultAdmin = async () => {
   }
 };
 
-
 const connectToMongoDB = async () => {
   try {
     console.log('🔗 Conectando ao MongoDB...');
@@ -99,9 +98,9 @@ const connectToMongoDB = async () => {
     await db.collection('users').createIndex({ username: 1 }, { unique: true });
     await db.collection('employees').createIndex({ email: 1 }, { unique: true });
     await db.collection('time_records').createIndex({ employee_id: 1, timestamp: 1 });
-    await db.collection('pause_reasons').createIndex({ name: 1 }, { unique: true }); // NOVO
-    await db.collection('requests').createIndex({ employee_id: 1, created_at: -1 }); // NOVO
-    await db.collection('requests').createIndex({ status: 1 }); // NOVO
+    await db.collection('pause_reasons').createIndex({ name: 1 }, { unique: true });
+    await db.collection('requests').createIndex({ employee_id: 1, created_at: -1 });
+    await db.collection('requests').createIndex({ status: 1 });
     
     // Criar usuário admin padrão e justificativas
     await createDefaultAdmin();
@@ -110,8 +109,6 @@ const connectToMongoDB = async () => {
     console.error('💡 Dica: Verifique a string de conexão no Render');
   }
 };
-
-
 
 // ==================== MIDDLEWARES ====================
 
@@ -300,8 +297,6 @@ app.post('/api/register', authenticateToken, requireAdmin, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-// ==================== ROTAS COMPLETAS DE USUÁRIOS ====================
 
 // Listar usuários (apenas admin)
 app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
@@ -600,233 +595,7 @@ app.delete('/api/employees/:id', authenticateToken, requireAdmin, async (req, re
   }
 });
 
-// ==================== ROTAS DE REGISTRO DE PONTO (ADMIN) ====================
-// app.post('/api/time-records', authenticateToken, requireAdmin, async (req, res) => {
-//   const { employee_id, type } = req.body;
-//   const timestamp = new Date();
-
-//   try {
-//     // Validar o tipo de registro
-//     if (!['entry', 'pause', 'exit'].includes(type)) {
-//       return res.status(400).json({ error: 'Tipo de registro inválido. Use: entry, pause ou exit' });
-//     }
-
-//     // Buscar o último registro do funcionário hoje
-//     const today = new Date();
-//     today.setHours(0, 0, 0, 0);
-    
-//     const lastRecord = await db.collection('time_records')
-//       .findOne({
-//         employee_id: new ObjectId(employee_id),
-//         timestamp: { $gte: today }
-//       }, {
-//         sort: { timestamp: -1 }
-//       });
-
-//     if (type === 'entry') {
-//       if (lastRecord && lastRecord.type === 'entry') {
-//         return res.status(400).json({ 
-//           error: 'Entrada já registrada. Registre pausa ou saída primeiro.' 
-//         });
-//       }
-//       // Permite entrada após saída (novo turno no mesmo dia)
-//     } 
-//     else if (type === 'pause') {
-//       // Só pode pausar se a última ação foi entrada
-//       if (!lastRecord || lastRecord.type !== 'entry') {
-//         return res.status(400).json({ 
-//           error: 'Você precisa registrar uma entrada antes de pausar.' 
-//         });
-//       }
-//     } 
-//     else if (type === 'exit') {
-//       // Pode sair se:
-//       // - Último registro foi entrada (expediente sem pausa)
-//       // - Último registro foi pausa (saída direta após pausa)
-//       // - Último registro foi entrada após retorno (expediente com pausa)
-//       if (!lastRecord) {
-//         return res.status(400).json({ 
-//           error: 'Registro de entrada não encontrado para hoje.' 
-//         });
-//       }
-//       if (lastRecord.type === 'exit') {
-//         return res.status(400).json({ 
-//           error: 'Saída já registrada para hoje.' 
-//         });
-//       }
-//     }
-
-//     const result = await db.collection('time_records').insertOne({
-//       employee_id: new ObjectId(employee_id),
-//       type,
-//       timestamp,
-//       created_at: new Date()
-//     });
-
-//     const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
-//     res.status(201).json(newRecord);
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
-
-// app.get('/api/time-records/:employee_id', authenticateToken, requireAdmin, async (req, res) => {
-//   const { employee_id } = req.params;
-//   const { start_date, end_date } = req.query;
-
-//   try {
-//     const records = await db.collection('time_records')
-//       .find({
-//         employee_id: new ObjectId(employee_id),
-//         timestamp: {
-//           $gte: new Date(start_date),
-//           $lte: new Date(end_date + 'T23:59:59.999Z')
-//         }
-//       })
-//       .sort({ timestamp: -1 })
-//       .toArray();
-
-//     res.json(records);
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
-
-// Função para criar justificativas padrão
-
 // ==================== ROTAS PESSOAIS DO FUNCIONÁRIO ====================
-
-// Funcionário ver seus próprios dados
-// app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
-//   const { type } = req.body;
-//   const timestamp = new Date();
-
-//   try {
-//     const user = await db.collection('users').findOne({ 
-//       _id: new ObjectId(req.user.id) 
-//     });
-
-//     if (!user || !user.employee_id) {
-//       return res.status(400).json({ error: 'Funcionário não vinculado' });
-//     }
-
-//     // Validar o tipo de registro
-//     if (!['entry', 'pause', 'exit'].includes(type)) {
-//       return res.status(400).json({ error: 'Tipo de registro inválido. Use: entry, pause ou exit' });
-//     }
-
-//     // Buscar o último registro do funcionário hoje
-//     const today = new Date();
-//     today.setHours(0, 0, 0, 0);
-    
-//     const lastRecord = await db.collection('time_records')
-//       .findOne({
-//         employee_id: user.employee_id,
-//         timestamp: { $gte: today }
-//       }, {
-//         sort: { timestamp: -1 }
-//       });
-
-//     // MESMA LÓGICA CORRIGIDA APLICADA AQUI
-//     if (type === 'entry') {
-//       if (lastRecord && lastRecord.type === 'entry') {
-//         return res.status(400).json({ 
-//           error: 'Entrada já registrada. Registre pausa ou saída primeiro.' 
-//         });
-//       }
-//     } 
-//     else if (type === 'pause') {
-//       if (!lastRecord || lastRecord.type !== 'entry') {
-//         return res.status(400).json({ 
-//           error: 'Você precisa registrar uma entrada antes de pausar.' 
-//         });
-//       }
-//     } 
-//     else if (type === 'exit') {
-//       if (!lastRecord) {
-//         return res.status(400).json({ 
-//           error: 'Registro de entrada não encontrado para hoje.' 
-//         });
-//       }
-//       if (lastRecord.type === 'exit') {
-//         return res.status(400).json({ 
-//           error: 'Saída já registrada para hoje.' 
-//         });
-//       }
-//     }
-
-//     const result = await db.collection('time_records').insertOne({
-//       employee_id: user.employee_id,
-//       type,
-//       timestamp,
-//       created_at: new Date()
-//     });
-
-//     const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
-    
-//     // Buscar dados do funcionário para a resposta
-//     const employee = await db.collection('employees').findOne({ 
-//       _id: user.employee_id 
-//     });
-
-//     res.status(201).json({
-//       ...newRecord,
-//       employee_name: employee?.name
-//     });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
-
-// Editar justificativa
-app.put('/api/pause-reasons/:id', authenticateToken, requireAdmin, async (req, res) => {
-  const { id } = req.params;
-  const { name, description } = req.body;
-
-  try {
-    // Verificar se a justificativa existe
-    const existingReason = await db.collection('pause_reasons').findOne({ 
-      _id: new ObjectId(id) 
-    });
-    
-    if (!existingReason) {
-      return res.status(404).json({ error: 'Justificativa não encontrada' });
-    }
-
-    // Verificar se nome já existe (excluindo a própria justificativa)
-    if (name && name !== existingReason.name) {
-      const reasonWithSameName = await db.collection('pause_reasons').findOne({ 
-        name, 
-        _id: { $ne: new ObjectId(id) } 
-      });
-      
-      if (reasonWithSameName) {
-        return res.status(400).json({ error: 'Já existe uma justificativa com este nome' });
-      }
-    }
-
-    const result = await db.collection('pause_reasons').updateOne(
-      { _id: new ObjectId(id) },
-      { 
-        $set: { 
-          name,
-          description,
-          updated_at: new Date()
-        } 
-      }
-    );
-
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ error: 'Justificativa não encontrada' });
-    }
-
-    const updatedReason = await db.collection('pause_reasons').findOne({ _id: new ObjectId(id) });
-    res.json(updatedReason);
-  } catch (error) {
-    console.error('❌ Erro ao editar justificativa:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // Funcionário ver seus próprios registros de ponto
 app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
@@ -862,7 +631,7 @@ app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, 
   }
 });
 
-// Funcionário registrar seu próprio ponto
+// Funcionário registrar seu próprio ponto (sem justificativa)
 app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
   const { type } = req.body;
   const timestamp = new Date();
@@ -893,31 +662,31 @@ app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req,
         sort: { timestamp: -1 }
       });
 
-    // Validar regras de negócio
+    // NOVA LÓGICA - Permitir múltiplas pausas
     if (type === 'entry') {
-      // Não pode dar entrada se já houver uma entrada sem saída
+      // Pode dar entrada se:
+      // - Não há registros hoje (primeiro registro)
+      // - Último registro foi saída (novo turno)
+      // - Último registro foi pausa (retorno do almoço)
       if (lastRecord && lastRecord.type === 'entry') {
         return res.status(400).json({ 
-          error: 'Você já registrou uma entrada. Registre pausa ou saída primeiro.' 
-        });
-      }
-      if (lastRecord && lastRecord.type === 'pause') {
-        return res.status(400).json({ 
-          error: 'Você está em pausa. Registre saída primeiro antes de uma nova entrada.' 
+          error: 'Entrada já registrada. Registre uma pausa ou saída primeiro.' 
         });
       }
     } else if (type === 'pause') {
-      // Só pode dar pausa se houver entrada sem saída
+      // Pode pausar se a última ação foi entrada
       if (!lastRecord || lastRecord.type !== 'entry') {
         return res.status(400).json({ 
           error: 'Você precisa registrar uma entrada antes de pausar.' 
         });
       }
     } else if (type === 'exit') {
-      // Só pode dar saída se houver entrada (e não pode ter saída já registrada)
+      // Pode sair se:
+      // - Último registro foi entrada (sem pausa)
+      // - Último registro foi pausa (saída após pausa)
       if (!lastRecord || (lastRecord.type !== 'entry' && lastRecord.type !== 'pause')) {
         return res.status(400).json({ 
-          error: 'Você precisa registrar uma entrada antes de sair.' 
+          error: 'Registro de entrada não encontrado para hoje.' 
         });
       }
     }
@@ -1367,18 +1136,6 @@ app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (re
       { header: 'Salário Total', key: 'salario_total', width: 15 }
     ];
     
-    // Planilha detalhada de registros com pausas
-    const detailedSheet = workbook.addWorksheet('Registros Detalhados');
-    detailedSheet.columns = [
-      { header: 'Funcionário', key: 'nome', width: 25 },
-      { header: 'Data', key: 'data', width: 12 },
-      { header: 'Entrada', key: 'entrada', width: 10 },
-      { header: 'Pausa', key: 'pausa', width: 10 },
-      { header: 'Retorno', key: 'retorno', width: 10 },
-      { header: 'Saída', key: 'saida', width: 10 },
-      { header: 'Total Horas', key: 'total_horas', width: 12 }
-    ];
-
     // Adicionar dados na planilha principal
     payrollData.forEach(emp => {
       worksheet.addRow({
@@ -1392,64 +1149,7 @@ app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (re
         salario_extra: Math.round(emp.salario_extra * 100) / 100,
         salario_total: Math.round(emp.salario_total * 100) / 100
       });
-      
-      // Adicionar registros detalhados do funcionário
-      const recordsByDay = {};
-      emp.registros.forEach(record => {
-        const dateKey = new Date(record.timestamp).toISOString().split('T')[0];
-        if (!recordsByDay[dateKey]) {
-          recordsByDay[dateKey] = [];
-        }
-        recordsByDay[dateKey].push(record);
-      });
-
-      Object.keys(recordsByDay).sort().forEach(dateKey => {
-        const dayRecords = recordsByDay[dateKey];
-        const entradas = dayRecords.filter(r => r.type === 'entry');
-        const pausas = dayRecords.filter(r => r.type === 'pause');
-        const saida = dayRecords.find(r => r.type === 'exit');
-
-        const primeiraEntrada = entradas[0];
-        const retorno = entradas[1];
-        const pausa = pausas[0];
-
-        let totalHoras = '--:--';
-        if (primeiraEntrada && saida) {
-          let diffMs = new Date(saida.timestamp) - new Date(primeiraEntrada.timestamp);
-          
-          if (pausa && retorno) {
-            const pausaMs = new Date(retorno.timestamp) - new Date(pausa.timestamp);
-            diffMs -= pausaMs;
-          }
-          
-          const diffHours = diffMs / (1000 * 60 * 60);
-          const horas = Math.floor(diffHours);
-          const minutos = Math.floor((diffHours - horas) * 60);
-          totalHoras = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
-        }
-
-        detailedSheet.addRow({
-          nome: emp.nome,
-          data: new Date(dateKey),
-          entrada: primeiraEntrada ? new Date(primeiraEntrada.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : '--:--',
-          pausa: pausa ? new Date(pausa.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : '--:--',
-          retorno: retorno ? new Date(retorno.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : '--:--',
-          saida: saida ? new Date(saida.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : '--:--',
-          total_horas: totalHoras
-        });
-      });
     });
-
-    // Formatar a planilha detalhada
-    const detailedHeaderRow = detailedSheet.getRow(1);
-    detailedHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    detailedHeaderRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF2E86AB' }
-    };
-    detailedHeaderRow.alignment = { vertical: 'middle', horizontal: 'center' };
-    detailedSheet.getColumn(2).numFmt = 'dd/mm/yyyy';
 
     // Formatar números na planilha principal
     [5, 6, 7, 8].forEach(colIndex => {
@@ -1486,7 +1186,7 @@ app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (re
       worksheet.getCell(`F${totalRow}`).value = { formula: `SUM(F2:F${payrollData.length + 1})` };
       worksheet.getCell(`G${totalRow}`).value = { formula: `SUM(G2:G${payrollData.length + 1})` };
       worksheet.getCell(`H${totalRow}`).value = { formula: `SUM(H2:H${payrollData.length + 1})` };
-      worksheet.getCell(`I${totalRow}`).value = { formula: `SUM(I2:I${payrollData.length + 1})` };
+      worksheet.getCell(`I${totalRow}`).value = { formula: `SUM(I2:I${paylayrollData.length + 1})` };
       
       // Formatar células de totais
       for (let col = 6; col <= 9; col++) {
@@ -1588,7 +1288,8 @@ app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (re
   }
 });
 
-// Coleção de tipos de justificativa de pausa
+// ==================== JUSTIFICATIVAS DE PAUSA ====================
+
 app.get('/api/pause-reasons', authenticateToken, async (req, res) => {
   try {
     const reasons = await db.collection('pause_reasons')
@@ -1614,6 +1315,55 @@ app.post('/api/pause-reasons', authenticateToken, requireAdmin, async (req, res)
     const newReason = await db.collection('pause_reasons').findOne({ _id: result.insertedId });
     res.status(201).json(newReason);
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/pause-reasons/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { name, description } = req.body;
+
+  try {
+    // Verificar se a justificativa existe
+    const existingReason = await db.collection('pause_reasons').findOne({ 
+      _id: new ObjectId(id) 
+    });
+    
+    if (!existingReason) {
+      return res.status(404).json({ error: 'Justificativa não encontrada' });
+    }
+
+    // Verificar se nome já existe (excluindo a própria justificativa)
+    if (name && name !== existingReason.name) {
+      const reasonWithSameName = await db.collection('pause_reasons').findOne({ 
+        name, 
+        _id: { $ne: new ObjectId(id) } 
+      });
+      
+      if (reasonWithSameName) {
+        return res.status(400).json({ error: 'Já existe uma justificativa com este nome' });
+      }
+    }
+
+    const result = await db.collection('pause_reasons').updateOne(
+      { _id: new ObjectId(id) },
+      { 
+        $set: { 
+          name,
+          description,
+          updated_at: new Date()
+        } 
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Justificativa não encontrada' });
+    }
+
+    const updatedReason = await db.collection('pause_reasons').findOne({ _id: new ObjectId(id) });
+    res.json(updatedReason);
+  } catch (error) {
+    console.error('❌ Erro ao editar justificativa:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1819,9 +1569,8 @@ app.put('/api/requests/:id/status', authenticateToken, requireAdmin, async (req,
   }
 });
 
-// ==================== ATUALIZAÇÃO DO REGISTRO DE PAUSA COM JUSTIFICATIVA ====================
+// ==================== REGISTRO DE PONTO COM JUSTIFICATIVA ====================
 
-// NOVO endpoint para registro de ponto com justificativa para pausas
 app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee, async (req, res) => {
   const { type, pause_reason_id, custom_reason } = req.body;
   const timestamp = new Date();
@@ -1869,28 +1618,31 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
         sort: { timestamp: -1 }
       });
 
-    // Validar regras de negócio
+    // NOVA LÓGICA - Permitir múltiplas pausas
     if (type === 'entry') {
+      // Pode dar entrada se:
+      // - Não há registros hoje (primeiro registro)
+      // - Último registro foi saída (novo turno)
+      // - Último registro foi pausa (retorno do almoço)
       if (lastRecord && lastRecord.type === 'entry') {
         return res.status(400).json({ 
-          error: 'Você já registrou uma entrada. Registre pausa ou saída primeiro.' 
-        });
-      }
-      if (lastRecord && lastRecord.type === 'pause') {
-        return res.status(400).json({ 
-          error: 'Você está em pausa. Registre saída primeiro antes de uma nova entrada.' 
+          error: 'Entrada já registrada. Registre uma pausa ou saída primeiro.' 
         });
       }
     } else if (type === 'pause') {
+      // Pode pausar se a última ação foi entrada
       if (!lastRecord || lastRecord.type !== 'entry') {
         return res.status(400).json({ 
           error: 'Você precisa registrar uma entrada antes de pausar.' 
         });
       }
     } else if (type === 'exit') {
+      // Pode sair se:
+      // - Último registro foi entrada (sem pausa)
+      // - Último registro foi pausa (saída após pausa)
       if (!lastRecord || (lastRecord.type !== 'entry' && lastRecord.type !== 'pause')) {
         return res.status(400).json({ 
-          error: 'Você precisa registrar uma entrada antes de sair.' 
+          error: 'Registro de entrada não encontrado para hoje.' 
         });
       }
     }

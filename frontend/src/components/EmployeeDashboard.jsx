@@ -39,6 +39,7 @@ const EmployeeDashboard = () => {
   const [showAbsenceModal, setShowAbsenceModal] = useState(false);
   const [showTimeRecordModal, setShowTimeRecordModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
+  const [showPauseModal, setShowPauseModal] = useState(false);
 
   // Estados dos formulários
   const [absenceForm, setAbsenceForm] = useState({
@@ -50,6 +51,11 @@ const EmployeeDashboard = () => {
   const [timeRecordForm, setTimeRecordForm] = useState({
     date: '',
     time: '',
+    reason: '',
+    description: ''
+  });
+
+  const [pauseForm, setPauseForm] = useState({
     reason: '',
     description: ''
   });
@@ -103,42 +109,6 @@ const EmployeeDashboard = () => {
     }
   };
 
-  const submitRequest = async (type, formData) => {
-    try {
-      setError('');
-
-      const requestData = {
-        type,
-        date: formData.date,
-        reason: formData.reason,
-        description: formData.description || '',
-        requested_time: type === 'time_record' ? formData.time : null
-      };
-
-      await axios.post('/api/requests', requestData);
-
-      // Fechar modal e limpar formulário
-      if (type === 'absence') {
-        setShowAbsenceModal(false);
-        setAbsenceForm({ date: '', reason: '', description: '' });
-      } else {
-        setShowTimeRecordModal(false);
-        setTimeRecordForm({ date: '', time: '', reason: '', description: '' });
-      }
-
-      // Recarregar lista de solicitações
-      await fetchMyRequests();
-
-      // Mostrar mensagem de sucesso
-      setError('');
-      alert('Solicitação enviada com sucesso! Aguarde a aprovação do administrador.');
-
-    } catch (error) {
-      console.error('Erro ao enviar solicitação:', error);
-      setError(error.response?.data?.error || 'Erro ao enviar solicitação');
-    }
-  };
-
   const fetchTodayRecords = async () => {
     try {
       const today = new Date();
@@ -183,12 +153,42 @@ const EmployeeDashboard = () => {
     }
   };
 
-  const registerTime = async (type) => {
+  // NOVA FUNÇÃO: Determinar quais botões devem ser mostrados baseado no último registro
+  const getAvailableActions = () => {
+    if (!lastRecordType) {
+      return ['entry']; // Primeiro registro do dia - apenas entrada
+    }
+
+    switch (lastRecordType) {
+      case 'entry':
+        return ['pause', 'exit']; // Após entrada: pode pausar ou sair
+      case 'pause':
+        return ['entry']; // Após pausa: pode retornar (nova entrada)
+      case 'exit':
+        return ['entry']; // Após saída: pode iniciar novo turno (entrada)
+      default:
+        return ['entry'];
+    }
+  };
+
+  const registerTime = async (type, pauseReason = null) => {
     setRegisterLoading(true);
     setError('');
 
     try {
-      const response = await axios.post('/api/me/time-records', { type });
+      let response;
+      
+      if (type === 'pause' && pauseReason) {
+        // Usar endpoint com justificativa para pausas
+        response = await axios.post('/api/me/time-records-with-reason', {
+          type,
+          pause_reason_id: pauseReason.reason === 'outro' ? null : pauseReason.reason,
+          custom_reason: pauseReason.description
+        });
+      } else {
+        // Endpoint normal para outros tipos
+        response = await axios.post('/api/me/time-records', { type });
+      }
 
       await fetchEmployeeData();
       await fetchTodayRecords();
@@ -201,11 +201,53 @@ const EmployeeDashboard = () => {
       });
       setLastRecordType(type);
 
+      // Fechar modal de pausa se aplicável
+      if (type === 'pause') {
+        setShowPauseModal(false);
+        setPauseForm({ reason: '', description: '' });
+      }
+
     } catch (error) {
       console.error('Erro ao registrar ponto:', error);
       setError(error.response?.data?.error || 'Erro ao registrar ponto');
     } finally {
       setRegisterLoading(false);
+    }
+  };
+
+  const submitRequest = async (type, formData) => {
+    try {
+      setError('');
+
+      const requestData = {
+        type,
+        date: formData.date,
+        reason: formData.reason,
+        description: formData.description || '',
+        requested_time: type === 'time_record' ? formData.time : null
+      };
+
+      await axios.post('/api/requests', requestData);
+
+      // Fechar modal e limpar formulário
+      if (type === 'absence') {
+        setShowAbsenceModal(false);
+        setAbsenceForm({ date: '', reason: '', description: '' });
+      } else {
+        setShowTimeRecordModal(false);
+        setTimeRecordForm({ date: '', time: '', reason: '', description: '' });
+      }
+
+      // Recarregar lista de solicitações
+      await fetchMyRequests();
+
+      // Mostrar mensagem de sucesso
+      setError('');
+      alert('Solicitação enviada com sucesso! Aguarde a aprovação do administrador.');
+
+    } catch (error) {
+      console.error('Erro ao enviar solicitação:', error);
+      setError(error.response?.data?.error || 'Erro ao enviar solicitação');
     }
   };
 
@@ -240,6 +282,7 @@ const EmployeeDashboard = () => {
     );
   };
 
+  const availableActions = getAvailableActions();
   const pendingRequestsCount = myRequests.filter(req => req.status === 'pending').length;
 
   if (loading) {
@@ -300,7 +343,7 @@ const EmployeeDashboard = () => {
               <p>Pontos registrados hoje</p>
             </div>
 
-            {/* Novo card para solicitações pendentes */}
+            {/* Card para solicitações pendentes */}
             <div
               className="stat-card clickable"
               onClick={() => setShowRequestsModal(true)}
@@ -315,7 +358,7 @@ const EmployeeDashboard = () => {
             </div>
           </div>
 
-          {/* Time Clock */}
+          {/* Time Clock - ATUALIZADO */}
           <div className="time-clock-container">
             <div className="time-clock-card">
               <div className="current-time">
@@ -333,8 +376,8 @@ const EmployeeDashboard = () => {
               </div>
 
               <div className="time-buttons">
-                {/* Botões de registro de ponto (mantidos iguais) */}
-                {(!lastRecordType || lastRecordType === 'exit') && (
+                {/* BOTÕES DINÂMICOS BASEADOS NO ÚLTIMO REGISTRO */}
+                {availableActions.includes('entry') && (
                   <button
                     className="btn btn-success btn-large"
                     onClick={() => registerTime('entry')}
@@ -344,6 +387,16 @@ const EmployeeDashboard = () => {
                       <>
                         <div className="loading-spinner"></div>
                         <span>Registrando...</span>
+                      </>
+                    ) : lastRecordType === 'pause' ? (
+                      <>
+                        <FiLogIn size={20} />
+                        <span>Retornar do Almoço</span>
+                      </>
+                    ) : lastRecordType === 'exit' ? (
+                      <>
+                        <FiLogIn size={20} />
+                        <span>Novo Turno</span>
                       </>
                     ) : (
                       <>
@@ -354,68 +407,30 @@ const EmployeeDashboard = () => {
                   </button>
                 )}
 
-                {lastRecordType === 'entry' && (
+                {availableActions.includes('pause') && (
                   <button
                     className="btn btn-warning btn-large"
-                    onClick={() => registerTime('pause')}
+                    onClick={() => setShowPauseModal(true)}
                     disabled={registerLoading}
                   >
-                    {registerLoading ? (
-                      <>
-                        <div className="loading-spinner"></div>
-                        <span>Registrando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FiPauseCircle size={20} />
-                        <span>Registrar Pausa</span>
-                      </>
-                    )}
+                    <FiPauseCircle size={20} />
+                    <span>Registrar Pausa</span>
                   </button>
                 )}
 
-                {lastRecordType === 'pause' && (
-                  <button
-                    className="btn btn-success btn-large"
-                    onClick={() => registerTime('entry')}
-                    disabled={registerLoading}
-                  >
-                    {registerLoading ? (
-                      <>
-                        <div className="loading-spinner"></div>
-                        <span>Registrando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FiLogIn size={20} />
-                        <span>Registrar Retorno</span>
-                      </>
-                    )}
-                  </button>
-                )}
-
-                {(lastRecordType === 'entry' || lastRecordType === 'pause') && (
+                {availableActions.includes('exit') && (
                   <button
                     className="btn btn-danger btn-large"
                     onClick={() => registerTime('exit')}
                     disabled={registerLoading}
                   >
-                    {registerLoading ? (
-                      <>
-                        <div className="loading-spinner"></div>
-                        <span>Registrando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FiLogOut size={20} />
-                        <span>Registrar Saída</span>
-                      </>
-                    )}
+                    <FiLogOut size={20} />
+                    <span>Registrar Saída</span>
                   </button>
                 )}
               </div>
 
-              {/* Botões de solicitação - Agora com modais */}
+              {/* Botões de solicitação */}
               <div className="request-buttons" style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
                 <h4 style={{ marginBottom: '15px', color: '#555' }}>Solicitações</h4>
 
@@ -525,6 +540,91 @@ const EmployeeDashboard = () => {
             </div>
           </div>
 
+          {/* Modal de Pausa - NOVO */}
+          {showPauseModal && (
+            <div className="modal-overlay">
+              <div className="modal">
+                <div className="modal-header">
+                  <h3>Registrar Pausa</h3>
+                  <button 
+                    className="btn-close-modal" 
+                    onClick={() => setShowPauseModal(false)}
+                  >
+                    <FiX size={20} />
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="form-group">
+                    <label>Motivo da Pausa *</label>
+                    <select
+                      value={pauseForm.reason}
+                      onChange={(e) => setPauseForm({ ...pauseForm, reason: e.target.value })}
+                      required
+                    >
+                      <option value="">Selecione um motivo</option>
+                      {pauseReasons.map(reason => (
+                        <option key={reason._id} value={reason._id}>
+                          {reason.name} {reason.description && `- ${reason.description}`}
+                        </option>
+                      ))}
+                      <option value="outro">Outro (especifique abaixo)</option>
+                    </select>
+                  </div>
+                  
+                  {pauseForm.reason === 'outro' && (
+                    <div className="form-group">
+                      <label>Descrição do Motivo *</label>
+                      <input
+                        type="text"
+                        value={pauseForm.description}
+                        onChange={(e) => setPauseForm({ ...pauseForm, description: e.target.value })}
+                        placeholder="Descreva o motivo da pausa..."
+                        required
+                      />
+                    </div>
+                  )}
+
+                  {pauseForm.reason !== 'outro' && pauseForm.reason !== '' && (
+                    <div className="form-group">
+                      <label>Observações Adicionais</label>
+                      <textarea
+                        value={pauseForm.description}
+                        onChange={(e) => setPauseForm({ ...pauseForm, description: e.target.value })}
+                        placeholder="Observações adicionais sobre a pausa..."
+                        rows="3"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => setShowPauseModal(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => registerTime('pause', pauseForm)}
+                    disabled={!pauseForm.reason || registerLoading}
+                  >
+                    {registerLoading ? (
+                      <>
+                        <div className="loading-spinner"></div>
+                        <span>Registrando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiPauseCircle size={16} />
+                        <span>Registrar Pausa</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Modal de Solicitação de Ausência */}
           {showAbsenceModal && (
             <div className="modal-overlay">
@@ -587,7 +687,7 @@ const EmployeeDashboard = () => {
             </div>
           )}
 
-          {/* Modal de Solicitação de Registro de Ponto - CORRIGIDO */}
+          {/* Modal de Solicitação de Registro de Ponto */}
           {showTimeRecordModal && (
             <div className="modal-overlay">
               <div className="modal">
@@ -642,88 +742,6 @@ const EmployeeDashboard = () => {
                       placeholder="Forneça mais detalhes sobre o ocorrido..."
                       rows="4"
                     />
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button className="btn btn-secondary" onClick={() => setShowTimeRecordModal(false)}>
-                    Cancelar
-                  </button>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => submitRequest('time_record', timeRecordForm)}
-                    disabled={!timeRecordForm.date || !timeRecordForm.time || !timeRecordForm.reason}
-                  >
-                    Enviar Solicitação
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Modal de Solicitação de Registro de Ponto */}
-          {showTimeRecordModal && (
-            <div className="modal-overlay">
-              <div className="modal">
-                <div className="modal-header">
-                  <h3>Solicitar Registro de Ponto</h3>
-                  <button
-                    className="btn-close-modal"
-                    onClick={() => setShowTimeRecordModal(false)}
-                  >
-                    <FiX size={20} />
-                  </button>
-                </div>
-                <div className="modal-body">
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Data *</label>
-                      <input
-                        type="date"
-                        value={timeRecordForm.date}
-                        onChange={(e) => setTimeRecordForm({ ...timeRecordForm, date: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Horário *</label>
-                      <input
-                        type="time"
-                        value={timeRecordForm.time}
-                        onChange={(e) => setTimeRecordForm({ ...timeRecordForm, time: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label>Motivo do Esquecimento *</label>
-                    <select
-                      value={timeRecordForm.reason}
-                      onChange={(e) => setAbsenceForm({ ...absenceForm, reason: e.target.value })}
-                      required
-                    >
-                      <option value="">Selecione um motivo</option>
-                      {pauseReasons.map(reason => (
-                        <option key={reason._id} value={reason.name}>
-                          {reason.name} {reason.description && `- ${reason.description}`}
-                        </option>
-                      ))}
-                      <option value="Outro">Outro (especifique na descrição)</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Descrição Detalhada</label>
-                    <div className="textarea-container">
-                      <textarea
-                        value={timeRecordForm.description}
-                        onChange={(e) => setTimeRecordForm({ ...timeRecordForm, description: e.target.value })}
-                        placeholder="Forneça mais detalhes sobre o ocorrido..."
-                        rows="4"
-                        className="description-textarea"
-                      />
-                      <div className="textarea-counter">
-                        {timeRecordForm.description.length}/500
-                      </div>
-                    </div>
                   </div>
                 </div>
                 <div className="modal-footer">
@@ -819,7 +837,7 @@ const EmployeeDashboard = () => {
             </div>
           )}
 
-          {/* Restante do código (Registros Recentes e Card de Informações) permanece igual */}
+          {/* Registros Recentes */}
           <div className="recent-section">
             <div className="section-header">
               <FiClock size={24} />
@@ -868,34 +886,34 @@ const EmployeeDashboard = () => {
               <div className="info-section">
                 <h4>
                   <FiLogIn size={18} />
-                  Registro de Entrada
+                  Registro de Ponto
                 </h4>
                 <ul>
-                  <li>Registre sua entrada ao chegar no trabalho</li>
-                  <li>Clique no botão verde "Registrar Entrada"</li>
-                  <li>O sistema captura automaticamente data e hora</li>
-                </ul>
-              </div>
-
-              <div className="info-section">
-                <h4>
-                  <FiLogOut size={18} />
-                  Registro de Saída
-                </h4>
-                <ul>
-                  <li>Registre sua saída ao finalizar o expediente</li>
-                  <li>Clique no botão vermelho "Registrar Saída"</li>
-                  <li>Seus registros ficam salvos automaticamente</li>
+                  <li><strong>Entrada:</strong> Ao chegar no trabalho</li>
+                  <li><strong>Pausa:</strong> Para almoço, café ou assuntos pessoais (com justificativa)</li>
+                  <li><strong>Retorno:</strong> Após pausas (botão "Retornar do Almoço")</li>
+                  <li><strong>Saída:</strong> Ao finalizar o expediente</li>
+                  <li><strong>Novo Turno:</strong> Se precisar registrar mais horas no mesmo dia</li>
                 </ul>
               </div>
 
               <div className="info-section">
                 <h4>Solicitações</h4>
                 <ul>
-                  <li>Use "Solicitar Ausência" para faltas justificadas</li>
+                  <li>Use "Justificar Ausência" para faltas justificadas</li>
                   <li>Use "Solicitar Ponto" para registrar horários esquecidos</li>
                   <li>Acompanhe o status em "Ver Minhas Solicitações"</li>
                   <li>O administrador pode adicionar observações na resposta</li>
+                </ul>
+              </div>
+
+              <div className="info-section">
+                <h4>Pausas</h4>
+                <ul>
+                  <li>Todas as pausas exigem justificativa</li>
+                  <li>Você pode fazer múltiplas pausas durante o dia</li>
+                  <li>Após cada pausa, clique em "Retornar do Almoço"</li>
+                  <li>As justificativas ficam registradas para controle</li>
                 </ul>
               </div>
             </div>
