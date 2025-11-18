@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 import {
   FiUser,
   FiClock,
@@ -35,6 +36,9 @@ const EmployeeDashboard = () => {
   const [myRequests, setMyRequests] = useState([]);
   const [pauseReasons, setPauseReasons] = useState([]);
 
+  // Obter usuário atual do contexto de autenticação
+  const { user } = useAuth();
+
   // Estados para os modais
   const [showAbsenceModal, setShowAbsenceModal] = useState(false);
   const [showTimeRecordModal, setShowTimeRecordModal] = useState(false);
@@ -60,12 +64,16 @@ const EmployeeDashboard = () => {
     description: ''
   });
 
+  // Resetar estado quando o usuário mudar
   useEffect(() => {
-    fetchEmployeeData();
-    fetchTodayRecords();
-    fetchMyRequests();
-    fetchPauseReasons();
+    if (user) {
+      resetState();
+      fetchAllData();
+    }
+  }, [user?.id]); // Recarregar quando o ID do usuário mudar
 
+  // Timer para atualizar hora atual
+  useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
@@ -73,9 +81,39 @@ const EmployeeDashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
+  const fetchAllData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Fazer todas as requisições em paralelo
+      await Promise.all([
+        fetchEmployeeData(),
+        fetchTodayRecords(),
+        fetchMyRequests(),
+        fetchPauseReasons()
+      ]);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      setError('Erro ao carregar dados do sistema');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetState = () => {
+    setEmployeeData(null);
+    setRecentRecords([]);
+    setTodayRecords(0);
+    setLastRecord(null);
+    setLastRecordType(null);
+    setTodayRecordsList([]);
+    setMyRequests([]);
+    setError('');
+  };
+
   const fetchEmployeeData = async () => {
     try {
-      setError('');
       const response = await axios.get('/api/dashboard/stats');
 
       if (response.data.role === 'employee') {
@@ -85,9 +123,7 @@ const EmployeeDashboard = () => {
       }
     } catch (error) {
       console.error('Erro ao buscar dados do funcionário:', error);
-      setError('Erro ao carregar dados');
-    } finally {
-      setLoading(false);
+      throw error;
     }
   };
 
@@ -97,6 +133,7 @@ const EmployeeDashboard = () => {
       setMyRequests(response.data);
     } catch (error) {
       console.error('Erro ao buscar solicitações:', error);
+      throw error;
     }
   };
 
@@ -106,6 +143,7 @@ const EmployeeDashboard = () => {
       setPauseReasons(response.data);
     } catch (error) {
       console.error('Erro ao buscar justificativas:', error);
+      throw error;
     }
   };
 
@@ -132,6 +170,7 @@ const EmployeeDashboard = () => {
     } catch (error) {
       console.error('Erro ao buscar registros de hoje:', error);
       setLastRecordType(null);
+      throw error;
     }
   };
 
@@ -150,16 +189,17 @@ const EmployeeDashboard = () => {
       setRecentRecords(response.data);
     } catch (error) {
       console.error('Erro ao buscar registros:', error);
+      throw error;
     }
   };
 
-  // NOVA FUNÇÃO: Determinar quais botões devem ser mostrados baseado no último registro
-  const getAvailableActions = () => {
-    if (!lastRecordType) {
+  // Função para determinar ações disponíveis - SEMPRE buscar dados atualizados
+  const getAvailableActions = (currentLastRecordType) => {
+    if (!currentLastRecordType) {
       return ['entry']; // Primeiro registro do dia - apenas entrada
     }
 
-    switch (lastRecordType) {
+    switch (currentLastRecordType) {
       case 'entry':
         return ['pause', 'exit']; // Após entrada: pode pausar ou sair
       case 'pause':
@@ -171,6 +211,7 @@ const EmployeeDashboard = () => {
     }
   };
 
+  // Registrar ponto com refresh completo dos dados
   const registerTime = async (type, pauseReason = null) => {
     setRegisterLoading(true);
     setError('');
@@ -179,27 +220,23 @@ const EmployeeDashboard = () => {
       let response;
       
       if (type === 'pause' && pauseReason) {
-        // Usar endpoint com justificativa para pausas
         response = await axios.post('/api/me/time-records-with-reason', {
           type,
           pause_reason_id: pauseReason.reason === 'outro' ? null : pauseReason.reason,
           custom_reason: pauseReason.description
         });
       } else {
-        // Endpoint normal para outros tipos
         response = await axios.post('/api/me/time-records', { type });
       }
 
-      await fetchEmployeeData();
-      await fetchTodayRecords();
-      await fetchRecentRecords();
+      // Recarregar TODOS os dados do servidor
+      await fetchAllData();
 
       setLastRecord({
         type,
         timestamp: new Date().toLocaleString('pt-BR'),
         employee: employeeData?.name
       });
-      setLastRecordType(type);
 
       // Fechar modal de pausa se aplicável
       if (type === 'pause') {
@@ -209,7 +246,15 @@ const EmployeeDashboard = () => {
 
     } catch (error) {
       console.error('Erro ao registrar ponto:', error);
-      setError(error.response?.data?.error || 'Erro ao registrar ponto');
+      
+      // Recarregar dados mesmo em caso de erro (pode ter sido registrado por outro usuário)
+      await fetchTodayRecords();
+      
+      const errorMessage = error.response?.data?.error || 'Erro ao registrar ponto';
+      setError(errorMessage);
+      
+      // Mostrar modal de erro
+      alert(errorMessage);
     } finally {
       setRegisterLoading(false);
     }
@@ -238,7 +283,7 @@ const EmployeeDashboard = () => {
         setTimeRecordForm({ date: '', time: '', reason: '', description: '' });
       }
 
-      // Recarregar lista de solicitações
+      // Recarregar dados atualizados
       await fetchMyRequests();
 
       // Mostrar mensagem de sucesso
@@ -282,7 +327,7 @@ const EmployeeDashboard = () => {
     );
   };
 
-  const availableActions = getAvailableActions();
+  const availableActions = getAvailableActions(lastRecordType);
   const pendingRequestsCount = myRequests.filter(req => req.status === 'pending').length;
 
   if (loading) {

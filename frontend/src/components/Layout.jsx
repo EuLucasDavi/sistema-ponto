@@ -3,9 +3,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   FiMenu, FiX, FiLogOut, FiBarChart2, FiUsers,
-  FiUser, FiClock, FiBriefcase,
+  FiUser, FiClock,
   FiHome, FiFileText, FiList
 } from 'react-icons/fi';
+import { FaFingerprint } from "react-icons/fa";
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
@@ -48,7 +49,7 @@ const Layout = ({ children }) => {
       <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo">
-            <FiBriefcase size={28} />
+            <FaFingerprint size={28} />
             <h1>Ponto Max</h1>
           </div>
           <p>{user?.role === 'admin' ? 'Painel Admin' : 'Meu Painel'}</p>

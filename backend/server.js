@@ -1186,7 +1186,7 @@ app.get('/api/reports/payroll/excel', authenticateToken, requireAdmin, async (re
       worksheet.getCell(`F${totalRow}`).value = { formula: `SUM(F2:F${payrollData.length + 1})` };
       worksheet.getCell(`G${totalRow}`).value = { formula: `SUM(G2:G${payrollData.length + 1})` };
       worksheet.getCell(`H${totalRow}`).value = { formula: `SUM(H2:H${payrollData.length + 1})` };
-      worksheet.getCell(`I${totalRow}`).value = { formula: `SUM(I2:I${paylayrollData.length + 1})` };
+      worksheet.getCell(`I${totalRow}`).value = { formula: `SUM(I2:I${payrollData.length + 1})` };
       
       // Formatar células de totais
       for (let col = 6; col <= 9; col++) {
