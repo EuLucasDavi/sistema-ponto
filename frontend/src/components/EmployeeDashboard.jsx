@@ -105,7 +105,7 @@ const EmployeeDashboard = () => {
     try {
       setLoading(true);
       setError('');
-      
+
       await Promise.all([
         fetchEmployeeData(),
         fetchTodayRecords(),
@@ -214,16 +214,16 @@ const EmployeeDashboard = () => {
 
   const getAvailableActions = (currentLastRecordType) => {
     if (!currentLastRecordType) {
-      return ['entry'];
+      return ['entry']; // Primeiro registro do dia - apenas entrada
     }
 
     switch (currentLastRecordType) {
       case 'entry':
-        return ['pause', 'exit'];
+        return ['pause', 'exit']; // Após entrada: pode pausar ou sair
       case 'pause':
-        return ['entry'];
+        return ['entry']; // Após pausa: pode apenas RETORNAR (entrada)
       case 'exit':
-        return ['entry'];
+        return ['entry']; // Após saída: pode iniciar novo turno (entrada)
       default:
         return ['entry'];
     }
@@ -236,7 +236,7 @@ const EmployeeDashboard = () => {
 
     try {
       let response;
-      
+
       if (type === 'pause' && pauseReason) {
         response = await axios.post('/api/me/time-records-with-reason', {
           type,
@@ -265,10 +265,10 @@ const EmployeeDashboard = () => {
       // MOSTRAR MODAL DE SUCESSO
       const actionNames = {
         'entry': 'Entrada',
-        'pause': 'Pausa', 
+        'pause': 'Pausa',
         'exit': 'Saída'
       };
-      
+
       showSuccessMessage(
         'Registro Confirmado',
         `${actionNames[type]} registrada com sucesso às ${new Date().toLocaleTimeString('pt-BR')}`
@@ -276,12 +276,12 @@ const EmployeeDashboard = () => {
 
     } catch (error) {
       console.error('Erro ao registrar ponto:', error);
-      
+
       // Recarregar dados mesmo em caso de erro
       await fetchTodayRecords();
-      
+
       const errorMessage = error.response?.data?.error || 'Erro ao registrar ponto';
-      
+
       // MOSTRAR MODAL DE ERRO
       showErrorMessage('Erro no Registro', errorMessage);
     } finally {
@@ -321,7 +321,7 @@ const EmployeeDashboard = () => {
         'absence': 'Ausência',
         'time_record': 'Registro de Ponto'
       };
-      
+
       showSuccessMessage(
         'Solicitação Enviada',
         `Sua solicitação de ${requestTypeNames[type]} foi enviada com sucesso! Aguarde a aprovação do administrador.`
@@ -439,6 +439,15 @@ const EmployeeDashboard = () => {
           {/* Time Clock (mantido igual) */}
           <div className="time-clock-container">
             <div className="time-clock-card">
+              <div className="work-status">
+                <div className={`status-indicator ${lastRecordType || 'waiting'}`}>
+                  <strong>Status Atual: </strong>
+                  {!lastRecordType && '🟡 Aguardando entrada'}
+                  {lastRecordType === 'entry' && '🟢 Em trabalho'}
+                  {lastRecordType === 'pause' && '🟠 Em pausa'}
+                  {lastRecordType === 'exit' && '🔴 Expediente encerrado'}
+                </div>
+              </div>
               <div className="current-time">
                 <div className="date-display">
                   {currentTime.toLocaleDateString('pt-BR', {
@@ -623,8 +632,8 @@ const EmployeeDashboard = () => {
                 <div className="modal-header success-header">
                   <FiCheckCircle size={24} className="success-icon" />
                   <h3>{modalContent.title}</h3>
-                  <button 
-                    className="btn-close-modal" 
+                  <button
+                    className="btn-close-modal"
                     onClick={closeModals}
                   >
                     <FiX size={20} />
@@ -636,8 +645,8 @@ const EmployeeDashboard = () => {
                   </div>
                 </div>
                 <div className="modal-footer">
-                  <button 
-                    className="btn btn-success" 
+                  <button
+                    className="btn btn-success"
                     onClick={closeModals}
                   >
                     <FiCheck size={16} />
@@ -655,8 +664,8 @@ const EmployeeDashboard = () => {
                 <div className="modal-header error-header">
                   <FiAlertCircle size={24} className="error-icon" />
                   <h3>{modalContent.title}</h3>
-                  <button 
-                    className="btn-close-modal" 
+                  <button
+                    className="btn-close-modal"
                     onClick={closeModals}
                   >
                     <FiX size={20} />
@@ -668,8 +677,8 @@ const EmployeeDashboard = () => {
                   </div>
                 </div>
                 <div className="modal-footer">
-                  <button 
-                    className="btn btn-danger" 
+                  <button
+                    className="btn btn-danger"
                     onClick={closeModals}
                   >
                     <FiX size={16} />
@@ -686,8 +695,8 @@ const EmployeeDashboard = () => {
               <div className="modal">
                 <div className="modal-header">
                   <h3>Registrar Pausa</h3>
-                  <button 
-                    className="btn-close-modal" 
+                  <button
+                    className="btn-close-modal"
                     onClick={() => setShowPauseModal(false)}
                   >
                     <FiX size={20} />
@@ -710,7 +719,7 @@ const EmployeeDashboard = () => {
                       <option value="outro">Outro (especifique abaixo)</option>
                     </select>
                   </div>
-                  
+
                   {pauseForm.reason === 'outro' && (
                     <div className="form-group">
                       <label>Descrição do Motivo *</label>
@@ -737,8 +746,8 @@ const EmployeeDashboard = () => {
                   )}
                 </div>
                 <div className="modal-footer">
-                  <button 
-                    className="btn btn-secondary" 
+                  <button
+                    className="btn btn-secondary"
                     onClick={() => setShowPauseModal(false)}
                   >
                     Cancelar

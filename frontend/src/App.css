@@ -2741,3 +2741,31 @@ body {
     gap: 8px;
   }
 }
+
+.work-status {
+  margin: 15px 0;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #6c757d;
+}
+
+.status-indicator {
+  font-size: 14px;
+}
+
+.status-indicator.waiting {
+  border-left-color: #ffc107;
+}
+
+.status-indicator.entry {
+  border-left-color: #28a745;
+}
+
+.status-indicator.pause {
+  border-left-color: #fd7e14;
+}
+
+.status-indicator.exit {
+  border-left-color: #dc3545;
+}

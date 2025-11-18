@@ -662,7 +662,7 @@ app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req,
         sort: { timestamp: -1 }
       });
 
-    // NOVA LÓGICA - Permitir múltiplas pausas
+    // NOVA LÓGICA CORRIGIDA - Não permitir pausas consecutivas
     if (type === 'entry') {
       // Pode dar entrada se:
       // - Não há registros hoje (primeiro registro)
@@ -674,7 +674,7 @@ app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req,
         });
       }
     } else if (type === 'pause') {
-      // Pode pausar se a última ação foi entrada
+      // Pode pausar APENAS se a última ação foi entrada (não pode pausar após outra pausa)
       if (!lastRecord || lastRecord.type !== 'entry') {
         return res.status(400).json({ 
           error: 'Você precisa registrar uma entrada antes de pausar.' 
@@ -1618,7 +1618,7 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
         sort: { timestamp: -1 }
       });
 
-    // NOVA LÓGICA - Permitir múltiplas pausas
+    // MESMA LÓGICA CORRIGIDA APLICADA AQUI
     if (type === 'entry') {
       // Pode dar entrada se:
       // - Não há registros hoje (primeiro registro)
@@ -1630,7 +1630,7 @@ app.post('/api/me/time-records-with-reason', authenticateToken, requireEmployee,
         });
       }
     } else if (type === 'pause') {
-      // Pode pausar se a última ação foi entrada
+      // Pode pausar APENAS se a última ação foi entrada (não pode pausar após outra pausa)
       if (!lastRecord || lastRecord.type !== 'entry') {
         return res.status(400).json({ 
           error: 'Você precisa registrar uma entrada antes de pausar.' 
