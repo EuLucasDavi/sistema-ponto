@@ -11,7 +11,8 @@ import {
   FiMail,
   FiBriefcase,
   FiUser,
-  FiAlertCircle
+  FiAlertCircle,
+  FiDollarSign // 💡 Importação adicional necessária
 } from 'react-icons/fi';
 
 const EmployeeManagement = () => {
@@ -25,7 +26,9 @@ const EmployeeManagement = () => {
     email: '',
     department: '',
     salary: '',
-    hire_date: ''
+    hire_date: '',
+    // 💡 NOVO CAMPO: Formato de hora extra/banco de horas
+    overtime_format: 'time_bank' 
   });
 
   useEffect(() => {
@@ -42,8 +45,27 @@ const EmployeeManagement = () => {
     } catch (error) {
       console.error('❌ Erro ao buscar funcionários:', error);
       console.error('📡 Detalhes do erro:', error.response?.data);
-      setError('Erro ao carregar funcionários: ' + (error.response?.data?.error || error.message));
+      setError('Erro ao buscar funcionários. Verifique a conexão com o servidor.');
     }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleEdit = (employee) => {
+    setEditingEmployee(employee);
+    setFormData({
+      name: employee.name,
+      email: employee.email,
+      department: employee.department,
+      salary: employee.salary || '',
+      hire_date: employee.hire_date ? new Date(employee.hire_date).toISOString().split('T')[0] : '',
+      // 💡 NOVO CAMPO: Carregar valor existente
+      overtime_format: employee.overtime_format || 'time_bank' 
+    });
+    setShowForm(true);
   };
 
   const handleSubmit = async (e) => {
@@ -53,206 +75,160 @@ const EmployeeManagement = () => {
 
     try {
       if (editingEmployee) {
+        // Atualizar funcionário
         await axios.put(`/api/employees/${editingEmployee._id}`, formData);
       } else {
+        // Criar novo funcionário
         await axios.post('/api/employees', formData);
       }
-      await fetchEmployees();
-      resetForm();
-    } catch (error) {
-      console.error('Erro ao salvar funcionário:', error);
-      setError(error.response?.data?.error || 'Erro ao salvar funcionário');
+      
+      handleCloseForm();
+      fetchEmployees();
+    } catch (err) {
+      const msg = err.response?.data?.error || `Erro ao ${editingEmployee ? 'atualizar' : 'criar'} funcionário.`;
+      setError(msg);
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Tem certeza que deseja excluir este funcionário?')) {
-      try {
-        await axios.delete(`/api/employees/${id}`);
-        await fetchEmployees();
-      } catch (error) {
-        console.error('Erro ao excluir funcionário:', error);
-        setError('Erro ao excluir funcionário');
-      }
+    if (!window.confirm('Tem certeza que deseja excluir este funcionário?')) return;
+    try {
+      await axios.delete(`/api/employees/${id}`);
+      fetchEmployees();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao excluir funcionário.');
     }
   };
 
-  const handleEdit = (employee) => {
-    setEditingEmployee(employee);
-    setFormData({
-      name: employee.name,
-      email: employee.email,
-      department: employee.department,
-      salary: employee.salary.toString(),
-      hire_date: employee.hire_date.split('T')[0]
-    });
-    setShowForm(true);
-    setError('');
-  };
-
-  const resetForm = () => {
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setEditingEmployee(null);
     setFormData({
       name: '',
       email: '',
       department: '',
       salary: '',
-      hire_date: ''
+      hire_date: '',
+      overtime_format: 'time_bank' // Resetar para o padrão
     });
-    setEditingEmployee(null);
-    setShowForm(false);
-    setError('');
   };
 
   return (
     <div className="container">
       <div className="header">
         <div className="header-title">
-          <FiUsers size={32} className="header-icon" />
+          <FiUsers className="header-icon" size={32} />
           <div>
-            <h1>Gerenciar Funcionários</h1>
-            <p>Cadastre e gerencie os funcionários do sistema</p>
+            <h1>Gestão de Funcionários</h1>
+            <p className="text-muted">Adicione, edite e remova usuários do sistema.</p>
           </div>
         </div>
-        <button 
-          className="btn btn-primary"
-          onClick={() => setShowForm(true)}
-          disabled={loading}
-        >
-          <FiUserPlus size={20} />
+        <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+          <FiUserPlus size={18} />
           <span>Novo Funcionário</span>
         </button>
       </div>
 
       {error && (
-        <div className="error-message">
-          <FiAlertCircle size={18} />
-          <span>{error}</span>
+        <div className="alert alert-danger" role="alert">
+          <FiAlertCircle size={18} /> {error}
         </div>
       )}
 
       {showForm && (
-        <div className="form-overlay">
-          <div className="form-container card">
-            <div className="form-header">
-              <div className="form-title">
-                {editingEmployee ? (
-                  <>
-                    <FiEdit2 size={24} />
-                    <h2>Editar Funcionário</h2>
-                  </>
-                ) : (
-                  <>
-                    <FiUserPlus size={24} />
-                    <h2>Novo Funcionário</h2>
-                  </>
-                )}
-              </div>
-              <button 
-                className="btn-close"
-                onClick={resetForm}
-                disabled={loading}
-              >
-                <FiX size={20} />
-              </button>
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h3>{editingEmployee ? 'Editar' : 'Novo'} Funcionário</h3>
+              <button className="btn-close-modal" onClick={handleCloseForm}><FiX size={20} /></button>
             </div>
-
             <form onSubmit={handleSubmit}>
-              <div className="form-grid">
+              <div className="modal-body">
+                
                 <div className="form-group">
-                  <label>
-                    <FiUser size={16} />
-                    Nome Completo
-                  </label>
+                  <label>Nome Completo *</label>
                   <input
                     type="text"
+                    name="name"
                     value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    onChange={handleChange}
+                    placeholder="Ex: João da Silva"
                     required
-                    disabled={loading}
-                    placeholder="Digite o nome completo"
                   />
                 </div>
-
+                
                 <div className="form-group">
-                  <label>
-                    <FiMail size={16} />
-                    Email
-                  </label>
+                  <label>Email *</label>
                   <input
                     type="email"
+                    name="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    onChange={handleChange}
+                    placeholder="exemplo@empresa.com"
                     required
-                    disabled={loading}
-                    placeholder="email@empresa.com"
                   />
                 </div>
-
+                
                 <div className="form-group">
-                  <label>
-                    <FiBriefcase size={16} />
-                    Departamento
-                  </label>
+                  <label>Departamento *</label>
                   <input
                     type="text"
+                    name="department"
                     value={formData.department}
-                    onChange={(e) => setFormData({...formData, department: e.target.value})}
+                    onChange={handleChange}
+                    placeholder="Ex: TI / Marketing"
                     required
-                    disabled={loading}
-                    placeholder="Ex: TI, RH, Vendas..."
                   />
                 </div>
-
+                
                 <div className="form-group">
-                  <label>
-                    Salário (R$)
-                  </label>
+                  <label>Salário Base (R$) *</label>
                   <input
                     type="number"
-                    step="0.01"
-                    min="0"
+                    name="salary"
                     value={formData.salary}
-                    onChange={(e) => setFormData({...formData, salary: e.target.value})}
+                    onChange={handleChange}
+                    placeholder="Ex: 3000.00"
                     required
-                    disabled={loading}
-                    placeholder="0.00"
                   />
                 </div>
 
+                {/* 💡 NOVO CAMPO: Formato de Excedente de Horas */}
                 <div className="form-group">
-                  <label>
-                    <FiCalendar size={16} />
-                    Data de Admissão
-                  </label>
+                  <label>Formato de Excedente de Horas *</label>
+                  <select
+                    name="overtime_format"
+                    value={formData.overtime_format}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="time_bank">Banco de Horas</option>
+                    <option value="paid_overtime">Hora Extra Paga</option>
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label>Data de Contratação *</label>
                   <input
                     type="date"
+                    name="hire_date"
                     value={formData.hire_date}
-                    onChange={(e) => setFormData({...formData, hire_date: e.target.value})}
+                    onChange={handleChange}
                     required
-                    disabled={loading}
                   />
                 </div>
               </div>
-
-              <div className="form-actions">
-                <button type="submit" className="btn btn-primary" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <div className="loading-spinner"></div>
-                      <span>Salvando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FiSave size={18} />
-                      <span>{editingEmployee ? 'Atualizar' : 'Cadastrar'}</span>
-                    </>
-                  )}
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={resetForm} disabled={loading}>
-                  <FiX size={18} />
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={handleCloseForm}>
+                  <FiX size={16} />
                   <span>Cancelar</span>
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={loading}>
+                  <FiSave size={16} />
+                  <span>{loading ? 'Salvando...' : 'Salvar'}</span>
                 </button>
               </div>
             </form>
@@ -260,49 +236,31 @@ const EmployeeManagement = () => {
         </div>
       )}
 
-      <div className="table-container card">
-        <table className="data-table">
+      <div className="employee-table">
+        <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Nome</th>
-              <th>Email</th>
-              <th>Departamento</th>
-              <th>Salário</th>
-              <th>Data Admissão</th>
+              <th><FiUser size={14} /> Nome</th>
+              <th><FiMail size={14} /> Email</th>
+              <th><FiBriefcase size={14} /> Depto</th>
+              <th><FiDollarSign size={14} /> Salário</th>
+              <th><FiClock size={14} /> Excedente</th> 
+              <th><FiCalendar size={14} /> Contratação</th>
               <th>Ações</th>
             </tr>
           </thead>
           <tbody>
             {employees.map(employee => (
               <tr key={employee._id}>
-                <td className="employee-id">{employee._id.substring(18)}</td>
-                <td className="employee-name">
-                  <div className="employee-info">
-                    <FiUser size={16} />
-                    <span>{employee.name}</span>
-                  </div>
-                </td>
-                <td className="employee-email">
-                  <div className="employee-info">
-                    <FiMail size={16} />
-                    <span>{employee.email}</span>
-                  </div>
-                </td>
-                <td className="employee-department">
-                  <div className="employee-info">
-                    <FiBriefcase size={16} />
-                    <span>{employee.department}</span>
-                  </div>
-                </td>
-                <td className="employee-salary">
-                  <div className="employee-info">
-                    <span>R$ {parseFloat(employee.salary).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                  </div>
-                </td>
-                <td className="employee-date">
-                  <div className="employee-info">
-                    <FiCalendar size={16} />
+                <td>{employee.name}</td>
+                <td>{employee.email}</td>
+                <td>{employee.department}</td>
+                <td>R$ {parseFloat(employee.salary).toFixed(2)}</td>
+                {/* 💡 Novo campo na tabela */}
+                <td>{employee.overtime_format === 'time_bank' ? 'Banco de Horas' : 'Hora Extra'}</td>
+                <td>
+                  <div className="date-cell">
+                    <FiCalendar size={14} />
                     <span>{new Date(employee.hire_date).toLocaleDateString('pt-BR')}</span>
                   </div>
                 </td>

@@ -12,7 +12,8 @@ import {
   FiBarChart2,
   FiSettings,
   FiUser,
-  FiInfo
+  FiInfo,
+  FiZap // Novo ícone para o botão de reset
 } from 'react-icons/fi';
 
 const Reports = () => {
@@ -22,7 +23,8 @@ const Reports = () => {
   const [endDate, setEndDate] = useState('');
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
-  const [loading, setLoading] = useState({ pdf: false, excel: false });
+  // Adicionado loading para o reset
+  const [loading, setLoading] = useState({ pdf: false, excel: false, reset: false }); 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -40,345 +42,309 @@ const Reports = () => {
 
   const fetchEmployees = async () => {
     try {
-      setError('');
-      const response = await axios.get('/api/employees');
+      // O endpoint /api/employees precisa retornar o campo current_time_bank
+      const response = await axios.get('/api/employees'); 
       setEmployees(response.data);
-    } catch (error) {
-      console.error('Erro ao buscar funcionários:', error);
-      setError('Erro ao carregar funcionários');
+    } catch (err) {
+      setError('Erro ao carregar lista de funcionários.');
     }
   };
 
-  const generateTimesheetPDF = async () => {
+  const handleMonthYearChange = (newMonth, newYear) => {
+    const firstDay = new Date(newYear, newMonth - 1, 1);
+    const lastDay = new Date(newYear, newMonth, 0);
+
+    setMonth(newMonth);
+    setYear(newYear);
+    setStartDate(firstDay.toISOString().split('T')[0]);
+    setEndDate(lastDay.toISOString().split('T')[0]);
+  };
+
+  const minutesToTimeDisplay = (totalMinutes) => {
+    if (totalMinutes === undefined || totalMinutes === null) return '0h 0m';
+    const sign = totalMinutes < 0 ? '-' : '';
+    const minutes = Math.abs(totalMinutes);
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${sign}${hours}h ${mins}m`;
+  };
+
+  // Função para zerar o Banco de Horas/Hora Extra
+  const handleResetBank = async () => {
     if (!selectedEmployee) {
-      setError('Selecione um funcionário');
+      setError('Por favor, selecione um funcionário para zerar o saldo de horas.');
+      return;
+    }
+    const employee = employees.find(e => e._id === selectedEmployee);
+    if (!confirm(`Tem certeza que deseja zerar o saldo de horas de ${employee?.name || 'este funcionário'}? Esta ação é irreversível.`)) {
       return;
     }
 
+    setLoading(prev => ({ ...prev, reset: true }));
+    setError('');
+    setSuccess('');
+
+    try {
+      await axios.post('/api/reports/reset-bank', {
+        employee_id: selectedEmployee,
+      });
+
+      // Atualiza a lista de funcionários para refletir o saldo zerado
+      await fetchEmployees();
+
+      setSuccess(`Saldo de horas zerado com sucesso para ${employee?.name || 'o funcionário'}.`);
+
+    } catch (err) {
+      // Tenta extrair a mensagem de erro do servidor
+      const serverError = err.response?.data?.error;
+      setError(serverError || 'Erro ao zerar o saldo de horas.');
+    } finally {
+      setLoading(prev => ({ ...prev, reset: false }));
+    }
+  };
+
+  // Função para download de PDF
+  const handleDownloadPDF = async () => {
+    if (!selectedEmployee || !startDate || !endDate) {
+      setError('Por favor, selecione um funcionário e o intervalo de datas.');
+      return;
+    }
     setLoading(prev => ({ ...prev, pdf: true }));
     setError('');
     setSuccess('');
 
     try {
-      const employee = employees.find(emp => emp._id === selectedEmployee);
-      
-      const response = await axios({
-        method: 'GET',
-        url: `/api/reports/timesheet/${selectedEmployee}/pdf`,
+      const response = await axios.get('/api/reports/pdf', {
         params: {
+          employee_id: selectedEmployee,
           start_date: startDate,
           end_date: endDate
         },
-        responseType: 'blob',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        responseType: 'blob' // Necessário para receber o binário do PDF
       });
 
-      // Criar blob URL
-      const blob = new Blob([response.data], { 
-        type: response.headers['content-type'] 
-      });
-      const blobUrl = window.URL.createObjectURL(blob);
-      
-      // Criar link para download
+      // Cria um link temporário para download
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `espelho-ponto-${employee.name.replace(/\s+/g, '_')}.pdf`;
+      link.href = url;
+      link.setAttribute('download', `espelho_ponto_${selectedEmployee}_${startDate}_${endDate}.pdf`);
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-      
-      setSuccess(`PDF gerado para ${employee.name}`);
-      
-    } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
-      setError('Erro ao gerar PDF: ' + (error.response?.data?.error || error.message));
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setSuccess('Relatório PDF gerado com sucesso!');
+
+    } catch (err) {
+      console.error('Erro ao baixar PDF:', err);
+      const serverError = err.response?.data?.error;
+      setError(serverError || 'Erro ao gerar relatório PDF. Verifique se há registros no período.');
     } finally {
       setLoading(prev => ({ ...prev, pdf: false }));
     }
   };
 
-  const generatePayrollExcel = async () => {
+  // Função para download de Excel
+  const handleDownloadExcel = async () => {
+    if (!selectedEmployee || !startDate || !endDate) {
+      setError('Por favor, selecione um funcionário e o intervalo de datas.');
+      return;
+    }
     setLoading(prev => ({ ...prev, excel: true }));
     setError('');
     setSuccess('');
 
     try {
-      const response = await axios({
-        method: 'GET',
-        url: '/api/reports/payroll/excel',
+      const response = await axios.get('/api/reports/excel', {
         params: {
-          month: month,
-          year: year
+          employee_id: selectedEmployee,
+          start_date: startDate,
+          end_date: endDate
         },
-        responseType: 'blob',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        responseType: 'blob' // Necessário para receber o binário do Excel
       });
 
-      // Criar blob URL
-      const blob = new Blob([response.data], { 
-        type: response.headers['content-type'] 
-      });
-      const blobUrl = window.URL.createObjectURL(blob);
-      
-      // Criar link para download
+      // Cria um link temporário para download
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
       const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `folha-pagamento-${month}-${year}.xlsx`;
+      link.href = url;
+      link.setAttribute('download', `relatorio_ponto_${selectedEmployee}_${startDate}_${endDate}.xlsx`);
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-      
-      setSuccess('Excel gerado com sucesso');
-      
-    } catch (error) {
-      console.error('Erro ao gerar Excel:', error);
-      setError('Erro ao gerar Excel: ' + (error.response?.data?.error || error.message));
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setSuccess('Relatório Excel gerado com sucesso!');
+
+    } catch (err) {
+      console.error('Erro ao baixar Excel:', err);
+      const serverError = err.response?.data?.error;
+      setError(serverError || 'Erro ao gerar relatório Excel. Verifique se há registros no período.');
     } finally {
       setLoading(prev => ({ ...prev, excel: false }));
     }
   };
 
-  const months = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-  ];
+  const currentEmployee = employees.find(e => e._id === selectedEmployee);
+  const currentOvertimeFormat = currentEmployee ? (currentEmployee.overtime_format === 'time_bank' ? 'Banco de Horas' : 'Hora Extra Paga') : 'N/A';
+  const currentTimeBank = currentEmployee ? minutesToTimeDisplay(currentEmployee.current_time_bank) : '0h 0m';
+  const timeBankLabel = currentEmployee?.overtime_format === 'time_bank' ? 'Saldo Atual' : 'Acumulado';
+
 
   return (
     <div className="container">
       <div className="header">
         <div className="header-title">
-          <FiBarChart2 size={32} className="header-icon" />
+          <FiFileText className="header-icon" size={32} />
           <div>
-            <h1>Relatórios</h1>
-            <p>Gere relatórios profissionais em PDF e Excel</p>
+            <h1>Relatórios Administrativos</h1>
+            <p className="text-muted">Gere espelhos de ponto e gerencie saldos de horas.</p>
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="error-message">
-          <FiAlertCircle size={18} />
-          <span>{error}</span>
+        <div className="alert alert-danger" role="alert">
+          <FiAlertCircle size={18} /> {error}
         </div>
       )}
 
       {success && (
-        <div className="success-message">
-          <FiCheckCircle size={18} />
-          <span>{success}</span>
+        <div className="alert alert-success" role="alert">
+          <FiCheckCircle size={18} /> {success}
         </div>
       )}
 
-      <div className="reports-grid">
-        {/* Espelho de Ponto */}
-        <div className="report-card">
-          <div className="report-card-header">
-            <div className="report-icon">
-              <FiFileText size={24} />
-            </div>
-            <div>
-              <h2>Espelho de Ponto</h2>
-              <p>Gere o espelho de ponto individual em formato profissional</p>
-            </div>
-          </div>
-          
+      <div className="report-config-card card">
+        <div className="section-header">
+          <FiSettings size={20} />
+          <h3>Configuração do Relatório</h3>
+        </div>
+        <div className="config-body">
           <div className="form-group">
-            <label>
-              <FiUser size={16} />
-              Funcionário:
-            </label>
-            <select 
-              value={selectedEmployee} 
-              onChange={(e) => setSelectedEmployee(e.target.value)}
-              disabled={loading.pdf}
+            <label><FiUsers size={14} /> Selecione o Funcionário *</label>
+            <select
+              value={selectedEmployee}
+              onChange={(e) => {
+                setSelectedEmployee(e.target.value);
+                setError('');
+                setSuccess('');
+              }}
+              required
             >
-              <option value="">Selecione um funcionário</option>
+              <option value="">-- Selecione um Funcionário --</option>
               {employees.map(employee => (
                 <option key={employee._id} value={employee._id}>
-                  {employee.name} - {employee.department}
+                  {employee.name} ({employee.email})
                 </option>
               ))}
             </select>
           </div>
-          
-          <div className="date-range">
+
+          <div className="form-row">
             <div className="form-group">
-              <label>
-                <FiCalendar size={16} />
-                Data Início:
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                disabled={loading.pdf}
-              />
+              <label><FiCalendar size={14} /> Data Inicial *</label>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
             </div>
-            
             <div className="form-group">
-              <label>
-                <FiCalendar size={16} />
-                Data Fim:
-              </label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                disabled={loading.pdf}
-              />
+              <label><FiCalendar size={14} /> Data Final *</label>
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
             </div>
           </div>
           
-          <button 
-            className="btn btn-primary btn-large"
-            onClick={generateTimesheetPDF}
-            disabled={!selectedEmployee || loading.pdf}
+          {selectedEmployee && currentEmployee && (
+            <div className="employee-info-summary">
+              <FiUser size={16} /> 
+              <span>
+                Formato de Excedente: <strong>{currentOvertimeFormat}</strong> | 
+                {timeBankLabel}: <strong>{currentTimeBank}</strong>
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="report-buttons">
+          <button
+            className="btn btn-primary"
+            onClick={handleDownloadPDF}
+            disabled={loading.pdf || !selectedEmployee || !startDate || !endDate}
           >
-            {loading.pdf ? (
-              <>
-                <div className="loading-spinner"></div>
-                <span>Gerando PDF...</span>
-              </>
-            ) : (
-              <>
-                <FiDownload size={20} />
-                <span>Baixar PDF</span>
-              </>
-            )}
+            <FiDownload size={16} />
+            {loading.pdf ? 'Gerando PDF...' : 'Espelho de Ponto (PDF)'}
           </button>
 
-          <div className="report-features">
+          <button
+            className="btn btn-success"
+            onClick={handleDownloadExcel}
+            disabled={loading.excel || !selectedEmployee || !startDate || !endDate}
+          >
+            <FiDownload size={16} />
+            {loading.excel ? 'Gerando Excel...' : 'Relatório de Ponto (Excel)'}
+          </button>
+
+          {/* NOVO BOTÃO: ZERAR BANCO DE HORAS */}
+          <button
+            className="btn btn-danger"
+            onClick={handleResetBank}
+            disabled={loading.reset || !selectedEmployee}
+            title="Zerar Saldo de Banco de Horas/Hora Extra do Funcionário"
+            style={{ marginLeft: 'auto' }}
+          >
+            <FiZap size={16} />
+            {loading.reset ? 'Zerando...' : 'Zerar Saldo de Horas'}
+          </button>
+        </div>
+      </div>
+
+      <div className="reports-section">
+        <div className="section-header">
+          <FiBarChart2 size={24} />
+          <h3>Sobre os Relatórios</h3>
+        </div>
+        <div className="report-info-grid">
+          <div className="info-card">
             <div className="section-header">
-              <FiCheckCircle size={20} />
-              <h4>Características do PDF</h4>
+              <FiFileText size={20} />
+              <h4>Espelho de Ponto (PDF)</h4>
             </div>
             <ul>
               <li>
                 <FiCheckCircle size={16} color="#28a745" />
-                Formato profissional de espelho de ponto
+                Formato de duas linhas por dia (Registro / Pausas).
               </li>
               <li>
                 <FiCheckCircle size={16} color="#28a745" />
-                Cálculo automático de horas trabalhadas
+                Cálculo de horas trabalhadas líquidas.
               </li>
               <li>
                 <FiCheckCircle size={16} color="#28a745" />
-                Controle de horas extras
+                Resumo de banco de horas ou valor de hora extra paga.
               </li>
               <li>
                 <FiCheckCircle size={16} color="#28a745" />
-                Totais consolidados do período
-              </li>
-              <li>
-                <FiCheckCircle size={16} color="#28a745" />
-                Espaço para assinaturas
-              </li>
-              <li>
-                <FiCheckCircle size={16} color="#28a745" />
-                Layout otimizado para impressão
+                Ideal para impressão e arquivo legal.
               </li>
             </ul>
           </div>
-        </div>
-
-        {/* Folha de Pagamento */}
-        <div className="report-card">
-          <div className="report-card-header">
-            <div className="report-icon">
-              <FiDollarSign size={24} />
-            </div>
-            <div>
-              <h2>Folha de Pagamento</h2>
-              <p>Gere a folha de pagamento completa com cálculos automáticos</p>
-            </div>
-          </div>
-          
-          <div className="form-group">
-            <label>
-              <FiCalendar size={16} />
-              Mês:
-            </label>
-            <select 
-              value={month} 
-              onChange={(e) => setMonth(e.target.value)}
-              disabled={loading.excel}
-            >
-              {months.map((monthName, index) => (
-                <option key={index + 1} value={index + 1}>
-                  {monthName}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="form-group">
-            <label>
-              <FiCalendar size={16} />
-              Ano:
-            </label>
-            <input
-              type="number"
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              min="2020"
-              max="2030"
-              disabled={loading.excel}
-            />
-          </div>
-          
-          <button 
-            className="btn btn-primary btn-large"
-            onClick={generatePayrollExcel}
-            disabled={loading.excel}
-          >
-            {loading.excel ? (
-              <>
-                <div className="loading-spinner"></div>
-                <span>Gerando Excel...</span>
-              </>
-            ) : (
-              <>
-                <FiDownload size={20} />
-                <span>Baixar Excel</span>
-              </>
-            )}
-          </button>
-
-          <div className="report-features">
+          <div className="info-card">
             <div className="section-header">
-              <FiCheckCircle size={20} />
-              <h4>Características do Excel</h4>
+              <FiDollarSign size={20} />
+              <h4>Relatório (Excel)</h4>
             </div>
             <ul>
               <li>
                 <FiCheckCircle size={16} color="#28a745" />
-                <strong>2 Planilhas:</strong> Resumo + Detalhes
+                Dados formatados em colunas para fácil manipulação.
               </li>
               <li>
                 <FiCheckCircle size={16} color="#28a745" />
-                Cálculo automático de horas extras (50%)
+                Totais consolidados automáticos.
               </li>
               <li>
                 <FiCheckCircle size={16} color="#28a745" />
-                Salário proporcional às horas trabalhadas
+                Inclui todos os dados de registro, pausas e resumo.
               </li>
               <li>
                 <FiCheckCircle size={16} color="#28a745" />
-                Base de 8 horas diárias
-              </li>
-              <li>
-                <FiCheckCircle size={16} color="#28a745" />
-                Totais consolidados automáticos
-              </li>
-              <li>
-                <FiCheckCircle size={16} color="#28a745" />
-                Formatação profissional
+                Perfeito para cálculos adicionais.
               </li>
             </ul>
           </div>
