@@ -63,16 +63,18 @@ const createDefaultPauseReasons = async () => {
 const createDefaultAdmin = async () => {
   try {
     const adminExists = await db.collection('users').findOne({ username: 'admin' });
+
     if (!adminExists) {
       const hashedPassword = await bcrypt.hash('admin123', 10);
+
       await db.collection('users').insertOne({
         username: 'admin',
         password: hashedPassword,
-        email: 'admin@ponto.com', // Adiciona email padrão
         role: 'admin',
         created_at: new Date()
       });
-      console.log('👤 Usuário admin criado: admin@ponto.com / admin123');
+
+      console.log('👤 Usuário admin criado: admin / admin123');
     } else {
       console.log('👤 Usuário admin já existe');
     }
@@ -362,24 +364,31 @@ app.post('/api/register', authenticateToken, requireAdmin, async (req, res) => {
 
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
-    const user = await db.collection('users').findOne({ _id: new ObjectId(req.user.userId) }, { projection: { password: 0 } });
-    
+    const user = await db.collection('users').findOne(
+      { _id: new ObjectId(req.user.id) },
+      { projection: { password: 0 } }
+    );
+
     if (!user) {
       return res.status(404).json({ error: 'Usuário não encontrado.' });
     }
-    
+
     let employeeData = null;
+
     if (user.employee_id) {
-        employeeData = await db.collection('employees').findOne({ _id: new ObjectId(user.employee_id) });
+      employeeData = await db.collection('employees').findOne({
+        _id: new ObjectId(user.employee_id)
+      });
     }
 
     res.json({
-        id: user._id, 
-        email: user.email, 
-        role: user.role, 
-        employee_id: user.employee_id,
-        employee_name: employeeData?.name
+      id: user._id,
+      username: user.username,
+      role: user.role,
+      employee_id: user.employee_id,
+      employee_name: employeeData?.name || null
     });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
