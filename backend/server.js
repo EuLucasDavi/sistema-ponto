@@ -33,28 +33,6 @@ let mongoClient;
 
 // --- FUNÇÕES DE SETUP E UTILS (Início) ---
 
-const connectToMongoDB = async () => {
-  try {
-    console.log('🔗 Conectando ao MongoDB...');
-
-    mongoClient = new MongoClient(process.env.MONGODB_URI);
-    await mongoClient.connect();
-    db = mongoClient.db('sistema_ponto');
-    console.log('✅ Conectado ao MongoDB Atlas com sucesso!');
-
-    await db.collection('users').createIndex({ username: 1 }, { unique: true });
-    await db.collection('employees').createIndex({ email: 1 }, { unique: true });
-    await db.collection('time_records').createIndex({ employee_id: 1, timestamp: 1 });
-    await db.collection('pause_reasons').createIndex({ name: 1 }, { unique: true });
-    await db.collection('requests').createIndex({ employee_id: 1, created_at: -1 });
-    await db.collection('requests').createIndex({ status: 1 });
-
-    await createDefaultAdmin();
-  } catch (error) {
-    console.error('❌ Erro ao conectar com MongoDB:', error.message);
-  }
-};
-
 const createDefaultPauseReasons = async () => {
   try {
     const defaultReasons = [
@@ -102,6 +80,28 @@ const createDefaultAdmin = async () => {
     await createDefaultPauseReasons();
   } catch (error) {
     console.error('❌ Erro ao criar admin:', error);
+  }
+};
+
+const connectToMongoDB = async () => {
+  try {
+    console.log('🔗 Conectando ao MongoDB...');
+
+    mongoClient = new MongoClient(process.env.MONGODB_URI);
+    await mongoClient.connect();
+    db = mongoClient.db('sistema_ponto');
+    console.log('✅ Conectado ao MongoDB Atlas com sucesso!');
+
+    await db.collection('users').createIndex({ username: 1 }, { unique: true });
+    await db.collection('employees').createIndex({ email: 1 }, { unique: true });
+    await db.collection('time_records').createIndex({ employee_id: 1, timestamp: 1 });
+    await db.collection('pause_reasons').createIndex({ name: 1 }, { unique: true });
+    await db.collection('requests').createIndex({ employee_id: 1, created_at: -1 });
+    await db.collection('requests').createIndex({ status: 1 });
+
+    await createDefaultAdmin();
+  } catch (error) {
+    console.error('❌ Erro ao conectar com MongoDB:', error.message);
   }
 };
 
