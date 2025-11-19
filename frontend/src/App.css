@@ -2394,7 +2394,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 9999;
   padding: 20px;
 }
 
@@ -2769,6 +2769,7 @@ body {
 
 .error-modal {
   border-left: 4px solid #dc3545;
+  box-shadow: 0 0 15px rgba(220, 53, 69, 0.5)
 }
 
 .success-header {
