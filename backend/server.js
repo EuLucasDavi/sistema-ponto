@@ -774,7 +774,7 @@ app.get('/api/pause-reasons', authenticateToken, requireEmployee, async (req, re
 
 app.post('/api/pause-reasons', authenticateToken, requireAdmin, async (req, res) => {
   const { name, description } = req.body;
-F
+
   try {
     const result = await db.collection('pause_reasons').insertOne({
       name,
