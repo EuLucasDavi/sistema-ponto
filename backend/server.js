@@ -692,16 +692,21 @@ app.delete('/api/employees/:id', authenticateToken, requireAdmin, async (req, re
 
 app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
   try {
-    if (req.user.role === 'admin') {
-      const totalEmployees = await db.collection('employees').countDocuments();
+    const user = await db.collection('users').findOne({
+      _id: new ObjectId(req.user.id)
+    });
 
+    // 🔥 Se o admin tiver employee_id vinculado, tratar como employee
+    const isEmployee = user.employee_id ? true : false;
+
+    if (req.user.role === 'admin' && !isEmployee) {
+      // Admin sem vínculo → dashboard administrativo
+      const totalEmployees = await db.collection('employees').countDocuments();
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       const todayRecords = await db.collection('time_records')
-        .countDocuments({
-          timestamp: { $gte: today }
-        });
+        .countDocuments({ timestamp: { $gte: today } });
 
       const recentEmployees = await db.collection('employees')
         .find()
@@ -709,28 +714,18 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
         .limit(5)
         .toArray();
 
-      res.json({
+      return res.json({
         role: 'admin',
         totalEmployees,
         todayRecords,
         recentEmployees
       });
-    } else {
-      const user = await db.collection('users').findOne({
-        _id: new ObjectId(req.user.id)
-      });
+    }
 
-      if (!user || !user.employee_id) {
-        return res.json({
-          role: 'employee',
-          employee: null,
-          todayRecords: 0,
-          recentRecords: []
-        });
-      }
-
+    // 🔥 Qualquer usuário que POSSA bater ponto cai aqui
+    if (isEmployee) {
       const employee = await db.collection('employees').findOne({
-        _id: user.employee_id
+        _id: new ObjectId(user.employee_id)
       });
 
       const today = new Date();
@@ -738,25 +733,32 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
 
       const todayRecords = await db.collection('time_records')
         .countDocuments({
-          employee_id: user.employee_id,
+          employee_id: new ObjectId(user.employee_id),
           timestamp: { $gte: today }
         });
 
       const recentRecords = await db.collection('time_records')
-        .find({
-          employee_id: user.employee_id
-        })
-        .sort({ timestamp: 1 })
+        .find({ employee_id: new ObjectId(user.employee_id) })
+        .sort({ timestamp: -1 })
         .limit(5)
         .toArray();
 
-      res.json({
+      return res.json({
         role: 'employee',
         employee,
         todayRecords,
         recentRecords
       });
     }
+
+    // Usuário sem vínculo
+    res.json({
+      role: 'employee',
+      employee: null,
+      todayRecords: 0,
+      recentRecords: []
+    });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
