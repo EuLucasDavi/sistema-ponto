@@ -13,14 +13,45 @@ dotenv.config();
 
 const app = express();
 
-// Configuração CORS
+// Helper: valida se string é ObjectId válido
+const isValidObjectIdString = (s) => {
+  if (!s || typeof s !== 'string') return false;
+  return /^[0-9a-fA-F]{24}$/.test(s);
+};
+
+const toObjectIdSafe = (value) => {
+  if (!value) return null;
+  if (value instanceof ObjectId) return value;
+  if (typeof value === 'string' && isValidObjectIdString(value)) return new ObjectId(value);
+  // Se for string não ObjectId, retorna null para evitar exceções
+  return null;
+};
+
+// Configuração CORS: aceita localhost, domínios exatos e qualquer subdomínio vercel.app
+const allowedExactOrigins = new Set([
+  'http://localhost:5173',
+  'https://sistema-ponto-beta.vercel.app'
+]);
+
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://sistema-ponto-beta.vercel.app',
-    'https://sistema-ponto-frontend-*.vercel.app',
-    'https://*.vercel.app'
-  ],
+  origin: (origin, callback) => {
+    // permitir requests sem origin (ex: ferramentas, curl, servidores)
+    if (!origin) return callback(null, true);
+
+    if (allowedExactOrigins.has(origin)) return callback(null, true);
+
+    // permitir qualquer subdomínio de vercel.app
+    try {
+      const url = new URL(origin);
+      if (url.hostname.endsWith('.vercel.app') || url.hostname === 'vercel.app') {
+        return callback(null, true);
+      }
+    } catch (e) {
+      // se não for URL válida, negar
+    }
+
+    return callback(new Error('CORS: origin not allowed'), false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -68,7 +99,7 @@ const createDefaultAdmin = async () => {
       await db.collection('users').insertOne({
         username: 'admin',
         password: hashedPassword,
-        email: 'admin@ponto.com', // Adiciona email padrão
+        email: 'admin@ponto.com',
         role: 'admin',
         created_at: new Date()
       });
@@ -87,7 +118,12 @@ const connectToMongoDB = async () => {
   try {
     console.log('🔗 Conectando ao MongoDB...');
 
-    mongoClient = new MongoClient(process.env.MONGODB_URI);
+    const uri = process.env.MONGODB_URI;
+    if (!uri) {
+      throw new Error('MONGODB_URI não configurado em .env');
+    }
+
+    mongoClient = new MongoClient(uri);
     await mongoClient.connect();
     db = mongoClient.db('sistema_ponto');
     console.log('✅ Conectado ao MongoDB Atlas com sucesso!');
@@ -101,7 +137,8 @@ const connectToMongoDB = async () => {
 
     await createDefaultAdmin();
   } catch (error) {
-    console.error('❌ Erro ao conectar com MongoDB:', error.message);
+    console.error('❌ Erro ao conectar com MongoDB:', (error && error.message) || error);
+    throw error;
   }
 };
 
@@ -123,14 +160,14 @@ const authenticateToken = (req, res, next) => {
 };
 
 const requireAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
+  if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Acesso restrito a administradores' });
   }
   next();
 };
 
 const requireEmployee = (req, res, next) => {
-  if (req.user.role !== 'employee' && req.user.role !== 'admin') {
+  if (!req.user || (req.user.role !== 'employee' && req.user.role !== 'admin')) {
     return res.status(403).json({ error: 'Acesso restrito' });
   }
   next();
@@ -140,7 +177,7 @@ const requireEmployee = (req, res, next) => {
 
 const minutesToTime = (totalMinutes) => {
   if (isNaN(totalMinutes) || totalMinutes === null || totalMinutes === undefined) return '00:00';
-  
+
   const sign = totalMinutes < 0 ? '-' : '';
   const minutes = Math.abs(Math.round(totalMinutes));
   const hours = Math.floor(minutes / 60);
@@ -149,71 +186,68 @@ const minutesToTime = (totalMinutes) => {
 };
 
 const calculateDailySummary = (records) => {
-    let totalWorkMinutes = 0;
-    let totalPauseMinutes = 0;
-    let clock = {
-        entry: null,
-        pause: null,
-        return: null, 
-        exit: null
-    };
-    const pauses = [];
+  let totalWorkMinutes = 0;
+  let totalPauseMinutes = 0;
+  let clock = {
+    entry: null,
+    pause: null,
+    return: null,
+    exit: null
+  };
+  const pauses = [];
 
-    if (!records || records.length === 0) {
-      return { totalWorkMinutes, totalPauseMinutes, pauses, dailyClock: {} };
+  if (!records || records.length === 0) {
+    return { totalWorkMinutes, totalPauseMinutes, pauses, dailyClock: {} };
+  }
+
+  records.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i];
+    const timestamp = new Date(record.timestamp);
+
+    if (record.type === 'entry' && !clock.entry) {
+      // Entrada/retorno
+      clock.entry = timestamp;
+    } else if (record.type === 'pause' && clock.entry) {
+      // Pausa após entrada
+      clock.pause = timestamp;
+      totalWorkMinutes += (clock.pause.getTime() - clock.entry.getTime()) / (1000 * 60);
+      clock.entry = null;
+
+      pauses.push({
+        reason: record.pause_reason_id || 'Outro',
+        description: record.custom_reason || '',
+        start: clock.pause
+      });
+    } else if (record.type === 'entry' && clock.pause) {
+      // Retorno da pausa
+      clock.return = timestamp;
+      totalPauseMinutes += (clock.return.getTime() - clock.pause.getTime()) / (1000 * 60);
+
+      clock.entry = clock.return;
+      clock.pause = null;
+      clock.return = null;
+
+      if (pauses.length > 0) {
+        pauses[pauses.length - 1].end = timestamp;
+      }
+    } else if (record.type === 'exit' && clock.entry) {
+      // Saída final
+      clock.exit = timestamp;
+      totalWorkMinutes += (clock.exit.getTime() - clock.entry.getTime()) / (1000 * 60);
+      clock.entry = null;
     }
+  }
 
-    records.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const dailyClock = {
+    entry: records.find(r => r.type === 'entry')?.timestamp,
+    pause: records.find(r => r.type === 'pause')?.timestamp,
+    return: records.filter(r => r.type === 'entry')[1]?.timestamp,
+    exit: records.find(r => r.type === 'exit')?.timestamp,
+  };
 
-    for (let i = 0; i < records.length; i++) {
-        const record = records[i];
-        const timestamp = new Date(record.timestamp);
-
-        if (record.type === 'entry' && !clock.entry) {
-            clock.entry = timestamp;
-        } 
-        
-        else if (record.type === 'pause' && clock.entry) {
-            clock.pause = timestamp;
-            totalWorkMinutes += (clock.pause.getTime() - clock.entry.getTime()) / (1000 * 60);
-            clock.entry = null;
-
-            pauses.push({
-                reason: record.pause_reason_id || 'Outro', 
-                description: record.custom_reason || '',
-                start: clock.pause
-            });
-        } 
-        
-        else if (record.type === 'entry' && clock.pause) { // Retorno
-            clock.return = timestamp;
-            totalPauseMinutes += (clock.return.getTime() - clock.pause.getTime()) / (1000 * 60);
-            
-            clock.entry = clock.return;
-            clock.pause = null;
-            clock.return = null;
-            
-            if (pauses.length > 0) {
-                 pauses[pauses.length - 1].end = timestamp;
-            }
-            
-        } 
-        
-        else if (record.type === 'exit' && clock.entry) {
-            clock.exit = timestamp;
-            totalWorkMinutes += (clock.exit.getTime() - clock.entry.getTime()) / (1000 * 60);
-            clock.entry = null;
-        }
-    }
-
-    const dailyClock = {
-        entry: records.find(r => r.type === 'entry')?.timestamp,
-        pause: records.find(r => r.type === 'pause')?.timestamp,
-        return: records.filter(r => r.type === 'entry')[1]?.timestamp, 
-        exit: records.find(r => r.type === 'exit')?.timestamp,
-    };
-
-    return { totalWorkMinutes, totalPauseMinutes, pauses, dailyClock };
+  return { totalWorkMinutes, totalPauseMinutes, pauses, dailyClock };
 };
 // --- ENDPOINTS DE CHECAGEM ---
 app.get('/health', async (req, res) => {
@@ -263,34 +297,36 @@ app.get('/api/test', (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email e senha obrigatórios.' });
+
     const user = await db.collection('users').findOne({ email });
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
-    const employee = user.employee_id ? await db.collection('employees').findOne({ _id: new ObjectId(user.employee_id) }) : null;
+    const employee = user.employee_id ? await db.collection('employees').findOne({ _id: toObjectIdSafe(String(user.employee_id)) }) : null;
 
     const token = jwt.sign(
-      { 
-        userId: user._id, 
-        email: user.email, 
-        role: user.role, 
-        employee_id: user.employee_id 
-      }, 
-      process.env.JWT_SECRET, 
+      {
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role,
+        employee_id: user.employee_id ? String(user.employee_id) : null
+      },
+      process.env.JWT_SECRET || 'secret',
       { expiresIn: '24h' }
     );
 
-    res.json({ 
-      token, 
-      user: { 
-        id: user._id, 
-        email: user.email, 
-        role: user.role, 
-        employee_id: user.employee_id,
+    res.json({
+      token,
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        role: user.role,
+        employee_id: user.employee_id ? String(user.employee_id) : null,
         employee_name: employee ? employee.name : null
-      } 
+      }
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -299,23 +335,27 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
-    const user = await db.collection('users').findOne({ _id: new ObjectId(req.user.userId) }, { projection: { password: 0 } });
-    
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ error: 'Token inválido.' });
+    }
+
+    const user = await db.collection('users').findOne({ _id: toObjectIdSafe(String(req.user.userId)) }, { projection: { password: 0 } });
+
     if (!user) {
       return res.status(404).json({ error: 'Usuário não encontrado.' });
     }
-    
+
     let employeeData = null;
     if (user.employee_id) {
-        employeeData = await db.collection('employees').findOne({ _id: new ObjectId(user.employee_id) });
+      employeeData = await db.collection('employees').findOne({ _id: toObjectIdSafe(String(user.employee_id)) });
     }
 
     res.json({
-        id: user._id, 
-        email: user.email, 
-        role: user.role, 
-        employee_id: user.employee_id,
-        employee_name: employeeData?.name
+      id: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      employee_id: user.employee_id ? String(user.employee_id) : null,
+      employee_name: employeeData?.name || null
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -325,7 +365,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 // --- ENDPOINTS DE FUNCIONÁRIOS ---
 app.get('/api/employees', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const employees = await db.collection('employees').find({}).toArray(); 
+    const employees = await db.collection('employees').find({}).toArray();
     res.json(employees);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -334,30 +374,30 @@ app.get('/api/employees', authenticateToken, requireAdmin, async (req, res) => {
 
 app.post('/api/employees', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { name, email, department, salary, hire_date, overtime_format } = req.body; 
+    const { name, email, department, salary, hire_date, overtime_format } = req.body;
 
-    if (!name || !email || !department || !salary || !hire_date || !overtime_format) {
+    if (!name || !email || !department || salary === undefined || !hire_date || !overtime_format) {
       return res.status(400).json({ error: 'Todos os campos são obrigatórios, incluindo Formato de Excedente de Horas.' });
     }
 
     const employeeExists = await db.collection('employees').findOne({ email });
     if (employeeExists) {
-        return res.status(400).json({ error: 'Um funcionário com este e-mail já existe.' });
+      return res.status(400).json({ error: 'Um funcionário com este e-mail já existe.' });
     }
-    
+
     const newEmployee = {
       name,
       email,
       department,
       salary: parseFloat(salary),
       hire_date: new Date(hire_date),
-      overtime_format, 
-      current_time_bank: 0, 
+      overtime_format,
+      current_time_bank: 0,
       created_at: new Date()
     };
 
     const result = await db.collection('employees').insertOne(newEmployee);
-    res.status(201).json({ ...newEmployee, _id: result.insertedId });
+    res.status(201).json({ ...newEmployee, _id: result.insertedId.toString() });
 
   } catch (error) {
     res.status(500).json({ error: 'Erro ao criar funcionário: ' + error.message });
@@ -367,9 +407,9 @@ app.post('/api/employees', authenticateToken, requireAdmin, async (req, res) => 
 app.put('/api/employees/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, department, salary, hire_date, overtime_format } = req.body; 
+    const { name, email, department, salary, hire_date, overtime_format } = req.body;
 
-    if (!name || !email || !department || !salary || !hire_date || !overtime_format) {
+    if (!name || !email || !department || salary === undefined || !hire_date || !overtime_format) {
       return res.status(400).json({ error: 'Todos os campos são obrigatórios, incluindo Formato de Excedente de Horas.' });
     }
 
@@ -379,11 +419,11 @@ app.put('/api/employees/:id', authenticateToken, requireAdmin, async (req, res) 
       department,
       salary: parseFloat(salary),
       hire_date: new Date(hire_date),
-      overtime_format, 
+      overtime_format,
     };
 
     const result = await db.collection('employees').updateOne({
-      _id: new ObjectId(id)
+      _id: toObjectIdSafe(String(id))
     }, {
       $set: updateData
     });
@@ -402,15 +442,19 @@ app.put('/api/employees/:id', authenticateToken, requireAdmin, async (req, res) 
 app.delete('/api/employees/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const objectId = toObjectIdSafe(String(id));
 
     // Desvincula usuários antes de deletar o funcionário
+    // tenta combinar tanto ObjectId quanto string armazenada
+    const matchEmployeeId = objectId ? { $or: [{ employee_id: objectId }, { employee_id: String(id) }] } : { employee_id: String(id) };
+
     await db.collection('users').updateMany(
-        { employee_id: id },
-        { $unset: { employee_id: "" }, $set: { role: 'admin' } } // Assume que desvinculado volta a ser admin (ajuste se necessário)
+      matchEmployeeId,
+      { $unset: { employee_id: "" }, $set: { role: 'admin' } } // Ajuste conforme necessidade de negócio
     );
 
     const result = await db.collection('employees').deleteOne({
-      _id: new ObjectId(id)
+      _id: objectId
     });
 
     if (result.deletedCount === 0) {
@@ -423,26 +467,23 @@ app.delete('/api/employees/:id', authenticateToken, requireAdmin, async (req, re
   }
 });
 
-
 // --- ENDPOINTS DE PAUSA ---
 app.get('/api/pause-reasons', authenticateToken, requireEmployee, async (req, res) => {
-    try {
-        const reasons = await db.collection('pause_reasons').find({}).toArray();
-        res.json(reasons);
-    } catch (error) {
-        res.status(500).json({ error: 'Erro ao buscar motivos de pausa: ' + error.message });
-    }
+  try {
+    const reasons = await db.collection('pause_reasons').find({}).toArray();
+    res.json(reasons);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar motivos de pausa: ' + error.message });
+  }
 });
-
 
 // --- ENDPOINT DE REGISTRO DE PONTO (CORRIGIDO) ---
 app.post('/api/time-records', authenticateToken, requireEmployee, async (req, res) => {
   try {
     const { type, pause_reason_id, custom_reason } = req.body;
     const { user } = req;
-    
-    const employeeId = user.employee_id ? new ObjectId(user.employee_id) : null;
 
+    const employeeId = toObjectIdSafe(String(user.employee_id));
     if (!employeeId) {
       return res.status(400).json({ error: 'Usuário não vinculado a um funcionário.' });
     }
@@ -452,29 +493,29 @@ app.post('/api/time-records', authenticateToken, requireEmployee, async (req, re
     }
 
     if (type === 'pause' && !pause_reason_id) {
-        return res.status(400).json({ error: 'Motivo da pausa é obrigatório.' });
+      return res.status(400).json({ error: 'Motivo da pausa é obrigatório.' });
     }
-    
+
     // Busca o último registro de ponto do funcionário hoje
     const today = new Date();
-    today.setHours(0, 0, 0, 0); 
+    today.setHours(0, 0, 0, 0);
 
     const lastRecord = await db.collection('time_records')
       .findOne({ employee_id: employeeId, timestamp: { $gte: today } }, { sort: { timestamp: -1 } });
 
     // Lógica de validação da sequência de registros
     if (type === 'entry') {
-      // Entrada/Retorno é permitido se: 
+      // Entrada/Retorno é permitido se:
       // 1. Não há registros (Início do dia)
       // 2. O último registro foi uma Saída ('exit') (Início de novo turno/dia)
       // 3. O último registro foi uma Pausa ('pause') (Retorno da Pausa)
       if (lastRecord && lastRecord.type !== 'exit' && lastRecord.type !== 'pause') {
-        return res.status(400).json({ 
-            error: 'Você só pode registrar Entrada/Retorno se for o primeiro registro, após uma Saída ou após uma Pausa.' 
+        return res.status(400).json({
+          error: 'Você só pode registrar Entrada/Retorno se for o primeiro registro, após uma Saída ou após uma Pausa.'
         });
       }
     }
-    
+
     if (type === 'pause') {
       // Pausa só é permitida após uma Entrada/Retorno ('entry')
       if (!lastRecord || lastRecord.type !== 'entry') {
@@ -493,9 +534,9 @@ app.post('/api/time-records', authenticateToken, requireEmployee, async (req, re
       employee_id: employeeId,
       timestamp: new Date(),
       type,
-      ...(type === 'pause' && { 
-        pause_reason_id: new ObjectId(pause_reason_id),
-        custom_reason 
+      ...(type === 'pause' && {
+        pause_reason_id: toObjectIdSafe(String(pause_reason_id)) || pause_reason_id,
+        custom_reason
       }),
       created_at: new Date()
     };
@@ -509,12 +550,13 @@ app.post('/api/time-records', authenticateToken, requireEmployee, async (req, re
     let pause_reason = null;
     if (type === 'pause' && pause_reason_id) {
       pause_reason = await db.collection('pause_reasons').findOne({
-        _id: new ObjectId(pause_reason_id)
+        _id: toObjectIdSafe(String(pause_reason_id))
       });
     }
 
     res.status(201).json({
       ...newRecord,
+      _id: result.insertedId.toString(),
       employee_name: employee?.name,
       pause_reason: pause_reason
     });
@@ -523,121 +565,121 @@ app.post('/api/time-records', authenticateToken, requireEmployee, async (req, re
   }
 });
 
-
 // --- ENDPOINT DE CONSULTA DE REGISTROS DO FUNCIONÁRIO (Manter) ---
 app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
-    try {
-        const { start_date, end_date } = req.query;
-        const employeeId = new ObjectId(req.user.employee_id);
+  try {
+    const { start_date, end_date } = req.query;
+    const employeeId = toObjectIdSafe(String(req.user.employee_id));
+    if (!employeeId) return res.status(400).json({ error: 'Usuário não vinculado a um funcionário.' });
 
-        let query = { employee_id: employeeId };
-        
-        if (start_date && end_date) {
-            const startDate = new Date(start_date);
-            const endDate = new Date(end_date);
-            endDate.setHours(23, 59, 59, 999); 
-            
-            query.timestamp = { $gte: startDate, $lte: endDate };
-        } else {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0); 
-            query.timestamp = { $gte: today };
-        }
+    let query = { employee_id: employeeId };
 
-        const records = await db.collection('time_records')
-            .find(query)
-            .sort({ timestamp: -1 })
-            .toArray();
+    if (start_date && end_date) {
+      const startDate = new Date(start_date);
+      const endDate = new Date(end_date);
+      endDate.setHours(23, 59, 59, 999);
 
-        res.json(records);
-
-    } catch (error) {
-        console.error('❌ Erro ao buscar registros de ponto:', error);
-        res.status(500).json({ error: 'Erro ao buscar registros de ponto: ' + error.message });
+      query.timestamp = { $gte: startDate, $lte: endDate };
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      query.timestamp = { $gte: today };
     }
-});
 
+    const records = await db.collection('time_records')
+      .find(query)
+      .sort({ timestamp: -1 })
+      .toArray();
+
+    res.json(records);
+
+  } catch (error) {
+    console.error('❌ Erro ao buscar registros de ponto:', error);
+    res.status(500).json({ error: 'Erro ao buscar registros de ponto: ' + error.message });
+  }
+});
 
 // --- ENDPOINT DE DASHBOARD STATS (NOVO) ---
 app.get('/api/dashboard/stats', authenticateToken, requireEmployee, async (req, res) => {
-    try {
-        const { user } = req;
-        const employeeId = new ObjectId(user.employee_id);
+  try {
+    const { user } = req;
+    const employeeId = toObjectIdSafe(String(user.employee_id));
+    if (!employeeId) return res.status(404).json({ error: 'Funcionário não encontrado.' });
 
-        const employee = await db.collection('employees').findOne({ _id: employeeId });
-        if (!employee) {
-            return res.status(404).json({ error: 'Funcionário não encontrado.' });
-        }
-
-        const recentRecords = await db.collection('time_records')
-            .find({ employee_id: employeeId })
-            .sort({ timestamp: -1 })
-            .limit(10)
-            .toArray();
-            
-        // Calcular o resumo do mês atual para o banco de horas
-        const today = new Date();
-        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        endOfMonth.setHours(23, 59, 59, 999);
-        
-        const monthlyRecords = await db.collection('time_records').find({
-            employee_id: employeeId,
-            timestamp: { $gte: startOfMonth, $lte: endOfMonth }
-        }).sort({ timestamp: 1 }).toArray();
-
-        const dailyRecordsMap = monthlyRecords.reduce((acc, record) => {
-            const dateStr = new Date(record.timestamp).toISOString().split('T')[0];
-            if (!acc[dateStr]) acc[dateStr] = [];
-            acc[dateStr].push(record);
-            return acc;
-        }, {});
-        
-        let totalWorkMinutesMonth = 0;
-        for (const dateStr in dailyRecordsMap) {
-            const summary = calculateDailySummary(dailyRecordsMap[dateStr]);
-            totalWorkMinutesMonth += summary.totalWorkMinutes;
-        }
-
-        // Simplificação: apenas retorna os dados brutos e registros
-        res.json({
-            role: user.role,
-            employee,
-            recentRecords,
-            current_month_work_minutes: totalWorkMinutesMonth,
-        });
-
-    } catch (error) {
-        console.error('❌ Erro ao buscar dados do dashboard:', error);
-        res.status(500).json({ error: 'Erro ao buscar dados do dashboard: ' + error.message });
+    const employee = await db.collection('employees').findOne({ _id: employeeId });
+    if (!employee) {
+      return res.status(404).json({ error: 'Funcionário não encontrado.' });
     }
-});
 
+    const recentRecords = await db.collection('time_records')
+      .find({ employee_id: employeeId })
+      .sort({ timestamp: -1 })
+      .limit(10)
+      .toArray();
+
+    // Calcular o resumo do mês atual para o banco de horas
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    endOfMonth.setHours(23, 59, 59, 999);
+
+    const monthlyRecords = await db.collection('time_records').find({
+      employee_id: employeeId,
+      timestamp: { $gte: startOfMonth, $lte: endOfMonth }
+    }).sort({ timestamp: 1 }).toArray();
+
+    const dailyRecordsMap = monthlyRecords.reduce((acc, record) => {
+      const dateStr = new Date(record.timestamp).toISOString().split('T')[0];
+      if (!acc[dateStr]) acc[dateStr] = [];
+      acc[dateStr].push(record);
+      return acc;
+    }, {});
+
+    let totalWorkMinutesMonth = 0;
+    for (const dateStr in dailyRecordsMap) {
+      const summary = calculateDailySummary(dailyRecordsMap[dateStr]);
+      totalWorkMinutesMonth += summary.totalWorkMinutes;
+    }
+
+    // Simplificação: apenas retorna os dados brutos e registros
+    res.json({
+      role: user.role,
+      employee,
+      recentRecords,
+      current_month_work_minutes: totalWorkMinutesMonth,
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao buscar dados do dashboard:', error);
+    res.status(500).json({ error: 'Erro ao buscar dados do dashboard: ' + error.message });
+  }
+});
 
 // --- ENDPOINTS DE SOLICITAÇÕES (REQUESTS) ---
 app.post('/api/requests', authenticateToken, requireEmployee, async (req, res) => {
   try {
     const { type, date, time, reason, description } = req.body;
-    const employeeId = new ObjectId(req.user.employee_id);
-    
+    const employeeId = toObjectIdSafe(String(req.user.employee_id));
+
+    if (!employeeId) return res.status(400).json({ error: 'Usuário não vinculado a um funcionário.' });
+
     if (!['absence', 'time_record'].includes(type) || !reason) {
-        return res.status(400).json({ error: 'Tipo de solicitação ou motivo inválido.' });
+      return res.status(400).json({ error: 'Tipo de solicitação ou motivo inválido.' });
     }
 
     if ((type === 'absence' && !date) || (type === 'time_record' && (!date || !time))) {
-        return res.status(400).json({ error: 'Campos de data/hora são obrigatórios para este tipo de solicitação.' });
+      return res.status(400).json({ error: 'Campos de data/hora são obrigatórios para este tipo de solicitação.' });
     }
 
     const newRequest = {
-        employee_id: employeeId,
-        type,
-        status: 'pending',
-        reason,
-        description: description || '',
-        created_at: new Date(),
-        // Campos específicos
-        ...(type === 'absence' && { date: new Date(date) }),
-        ...(type === 'time_record' && { date: new Date(date), time }),
+      employee_id: employeeId,
+      type,
+      status: 'pending',
+      reason,
+      description: description || '',
+      created_at: new Date(),
+      ...(type === 'absence' && { date: new Date(date) }),
+      ...(type === 'time_record' && { date: new Date(date), time }),
     };
 
     await db.collection('requests').insertOne(newRequest);
@@ -650,12 +692,14 @@ app.post('/api/requests', authenticateToken, requireEmployee, async (req, res) =
 
 app.get('/api/requests', authenticateToken, requireEmployee, async (req, res) => {
   try {
-    const employeeId = new ObjectId(req.user.employee_id);
+    const employeeId = toObjectIdSafe(String(req.user.employee_id));
+    if (!employeeId) return res.status(400).json({ error: 'Usuário não vinculado a um funcionário.' });
+
     const requests = await db.collection('requests')
-        .find({ employee_id: employeeId })
-        .sort({ created_at: -1 })
-        .limit(50) // Limita a busca para performance
-        .toArray();
+      .find({ employee_id: employeeId })
+      .sort({ created_at: -1 })
+      .limit(50)
+      .toArray();
 
     res.json(requests);
   } catch (error) {
@@ -665,382 +709,390 @@ app.get('/api/requests', authenticateToken, requireEmployee, async (req, res) =>
 
 // --- ENDPOINTS DE RELATÓRIOS ---
 app.post('/api/reports/reset-bank', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const { employee_id } = req.body;
+  try {
+    const { employee_id } = req.body;
 
-        if (!employee_id) {
-            return res.status(400).json({ error: 'ID do funcionário é obrigatório.' });
-        }
-
-        const result = await db.collection('employees').updateOne(
-            { _id: new ObjectId(employee_id) },
-            { $set: { current_time_bank: 0 } }
-        );
-
-        if (result.matchedCount === 0) {
-            return res.status(404).json({ error: 'Funcionário não encontrado.' });
-        }
-
-        res.status(200).json({ message: 'Saldo de horas zerado com sucesso.' });
-
-    } catch (error) {
-        console.error('Erro ao zerar saldo de horas:', error);
-        res.status(500).json({ error: 'Erro ao zerar saldo de horas: ' + error.message });
+    if (!employee_id) {
+      return res.status(400).json({ error: 'ID do funcionário é obrigatório.' });
     }
+
+    const result = await db.collection('employees').updateOne(
+      { _id: toObjectIdSafe(String(employee_id)) },
+      { $set: { current_time_bank: 0 } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Funcionário não encontrado.' });
+    }
+
+    res.status(200).json({ message: 'Saldo de horas zerado com sucesso.' });
+
+  } catch (error) {
+    console.error('Erro ao zerar saldo de horas:', error);
+    res.status(500).json({ error: 'Erro ao zerar saldo de horas: ' + error.message });
+  }
 });
 
 app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) => {
-    // Lógica completa de geração de PDF (mantida da resposta anterior)
-    try {
-        const { employee_id, start_date, end_date } = req.query;
+  try {
+    const { employee_id, start_date, end_date } = req.query;
 
-        if (!employee_id || !start_date || !end_date) {
-            return res.status(400).json({ error: 'ID do funcionário e intervalo de datas são obrigatórios.' });
-        }
-
-        const employee = await db.collection('employees').findOne({ _id: new ObjectId(employee_id) });
-        if (!employee) {
-            return res.status(404).json({ error: 'Funcionário não encontrado.' });
-        }
-
-        const startDate = new Date(start_date);
-        const endDate = new Date(end_date);
-        endDate.setDate(endDate.getDate() + 1); 
-
-        const records = await db.collection('time_records').find({
-            employee_id: new ObjectId(employee_id),
-            timestamp: { $gte: startDate, $lt: endDate }
-        }).sort({ timestamp: 1 }).toArray();
-        
-        const pauseReasonsMap = await db.collection('pause_reasons').find().toArray();
-        const getPauseReasonName = (id) => {
-            const reason = pauseReasonsMap.find(r => r._id.toString() === id);
-            return reason ? reason.name : 'Motivo Desconhecido';
-        };
-
-        const dailyRecords = records.reduce((acc, record) => {
-            const dateStr = new Date(record.timestamp).toISOString().split('T')[0];
-            if (!acc[dateStr]) acc[dateStr] = [];
-            acc[dateStr].push(record);
-            return acc;
-        }, {});
-
-        let totalWorkMinutesPeriod = 0;
-        const dailySummaries = {};
-
-        for (const dateStr in dailyRecords) {
-            const summary = calculateDailySummary(dailyRecords[dateStr]);
-            
-            summary.pauses.forEach(p => {
-                if(p.reason instanceof ObjectId || (typeof p.reason === 'string' && p.reason.length === 24)) {
-                    p.reason = getPauseReasonName(p.reason.toString());
-                } else {
-                    p.reason = p.reason || 'Outro'; 
-                }
-            });
-            
-            dailySummaries[dateStr] = summary;
-            totalWorkMinutesPeriod += summary.totalWorkMinutes;
-        }
-
-        // --- GERAÇÃO PDF ---
-        const doc = new PDFDocument({ margin: 30, size: 'A4' });
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="espelho_ponto_${employee.name.replace(/\s/g, '_')}_${start_date}_${req.query.end_date}.pdf"`);
-        doc.pipe(res);
-
-        // Header
-        doc.fontSize(16).text('Espelho de Ponto', { align: 'center' });
-        doc.fontSize(10).moveDown();
-        doc.text(`Funcionário: ${employee.name}`);
-        doc.text(`Período: ${new Date(start_date).toLocaleDateString('pt-BR')} a ${new Date(req.query.end_date).toLocaleDateString('pt-BR')}`);
-        doc.text(`Departamento: ${employee.department}`);
-        doc.moveDown();
-
-        // Tabela
-        const columnWidths = [60, 60, 60, 60, 60, 200];
-        const drawRow = (data, isHeader = false, isSummary = false) => {
-            let currentX = doc.x;
-            const rowHeight = isSummary ? 20 : 15;
-            
-            doc.moveTo(doc.x, doc.y).lineTo(doc.page.width - doc.options.margin, doc.y).stroke('black'); 
-            doc.y += 2;
-
-            doc.font(isHeader ? 'Helvetica-Bold' : (isSummary ? 'Helvetica-Oblique' : 'Helvetica'));
-            
-            data.forEach((text, i) => {
-                doc.fontSize(8).text(text, currentX, doc.y, {
-                    width: columnWidths[i],
-                    align: ['left', 'center', 'center', 'center', 'center', 'left'][i],
-                    height: rowHeight,
-                    valign: 'center'
-                });
-                currentX += columnWidths[i];
-            });
-            doc.moveDown(rowHeight / 10);
-            doc.y += rowHeight - 2;
-            doc.font('Helvetica');
-        };
-
-        drawRow(['Data', 'Entrada', 'Pausa', 'Retorno', 'Saída', 'Total Pausa / Motivos'], true);
-
-        for (const dateStr in dailySummaries) {
-            const summary = dailySummaries[dateStr];
-            const records = summary.dailyClock;
-            const date = new Date(dateStr).toLocaleDateString('pt-BR');
-            const totalPauseTimeStr = minutesToTime(summary.totalPauseMinutes);
-            const totalWorkTimeStr = minutesToTime(summary.totalWorkMinutes);
-            
-            const entryTime = records.entry ? new Date(records.entry).toLocaleTimeString('pt-BR').substring(0, 5) : 'FALTA';
-            const pauseTime = records.pause ? new Date(records.pause).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
-            const returnTime = records.return ? new Date(records.return).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
-            const exitTime = records.exit ? new Date(records.exit).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
-
-            drawRow([date, entryTime, pauseTime, returnTime, exitTime]);
-
-            const pauseReasonsText = summary.pauses.map(p => {
-                return `${p.reason} (${p.description || 's/ descrição'})`;
-            }).join('; ');
-            
-            drawRow([
-                '',
-                `Trabalho: ${totalWorkTimeStr}`,
-                '',
-                '',
-                '',
-                `Total Pausa: ${totalPauseTimeStr} | Motivos: ${pauseReasonsText || 'Nenhuma pausa registrada'}`
-            ], false, true); 
-        }
-        doc.moveTo(doc.x, doc.y).lineTo(doc.page.width - doc.options.margin, doc.y).stroke('black'); 
-        doc.moveDown(2);
-
-        // --- RESUMO/TOTALIZAÇÃO ---
-        const diffInTime = new Date(req.query.end_date).getTime() - new Date(start_date).getTime();
-        const totalDaysPeriod = Math.ceil(diffInTime / (1000 * 3600 * 24)) + 1;
-        
-        const totalWorkMinutes = totalWorkMinutesPeriod;
-        const standardHours = totalDaysPeriod * 8 * 60; 
-        
-        let diffMinutes = totalWorkMinutes - standardHours; 
-        const totalSalary = employee.salary || 0;
-        let extraValue = 0;
-        let timeBankBalance = employee.current_time_bank || 0;
-        
-        if (employee.overtime_format === 'paid_overtime') {
-            if (diffMinutes > 0) {
-                const hourlyRate = (totalSalary / 220); 
-                extraValue = (diffMinutes / 60) * hourlyRate * 1.5;
-            }
-        } else { 
-            timeBankBalance += diffMinutes;
-        }
-        
-        const diffMinutesStr = minutesToTime(diffMinutes);
-        const timeBankBalanceStr = minutesToTime(timeBankBalance);
-        
-        doc.fontSize(12).font('Helvetica-Bold').text('RESUMO DO PERÍODO', { underline: true }).moveDown(0.5);
-        doc.font('Helvetica').fontSize(10);
-        doc.text(`Horas Trabalhadas (Líquidas): ${minutesToTime(totalWorkMinutesPeriod)}`);
-        doc.text(`Horas Padrão (8h/dia, ${totalDaysPeriod} dias): ${minutesToTime(standardHours)}`);
-        doc.text(`Diferença em Relação ao Padrão: ${diffMinutesStr} ${diffMinutes > 0 ? '(Excedente)' : '(Débito)'}`);
-        doc.moveDown(0.5);
-        
-        doc.text(`Formato de Excedente: ${employee.overtime_format === 'time_bank' ? 'Banco de Horas' : 'Hora Extra Paga'}`);
-        
-        if (employee.overtime_format === 'time_bank') {
-            doc.font('Helvetica-Bold').text(`SALDO BANCO DE HORAS TOTAL: ${timeBankBalanceStr}`).moveDown(0.5);
-        } else {
-            doc.text(`Salário Base Mensal: R$ ${totalSalary.toFixed(2)}`);
-            if (extraValue > 0) {
-                doc.font('Helvetica-Bold').fillColor('red').text(`VALOR DE HORA EXTRA: R$ ${extraValue.toFixed(2)}`).moveDown(0.5);
-            } else {
-                doc.text(`VALOR DE HORA EXTRA: R$ 0.00`).moveDown(0.5);
-            }
-        }
-        doc.fillColor('black'); 
-
-        doc.end();
-
-    } catch (error) {
-        console.error('Erro ao gerar relatório PDF:', error);
-        res.status(500).json({ error: 'Erro ao gerar relatório PDF: ' + error.message });
+    if (!employee_id || !start_date || !end_date) {
+      return res.status(400).json({ error: 'ID do funcionário e intervalo de datas são obrigatórios.' });
     }
+
+    const employee = await db.collection('employees').findOne({ _id: toObjectIdSafe(String(employee_id)) });
+    if (!employee) {
+      return res.status(404).json({ error: 'Funcionário não encontrado.' });
+    }
+
+    const startDate = new Date(start_date);
+    const endDate = new Date(end_date);
+    endDate.setDate(endDate.getDate() + 1);
+
+    const records = await db.collection('time_records').find({
+      employee_id: toObjectIdSafe(String(employee_id)),
+      timestamp: { $gte: startDate, $lt: endDate }
+    }).sort({ timestamp: 1 }).toArray();
+
+    const pauseReasonsMap = await db.collection('pause_reasons').find().toArray();
+    const getPauseReasonName = (id) => {
+      const reason = pauseReasonsMap.find(r => r._id.toString() === (String(id)));
+      return reason ? reason.name : 'Motivo Desconhecido';
+    };
+
+    const dailyRecords = records.reduce((acc, record) => {
+      const dateStr = new Date(record.timestamp).toISOString().split('T')[0];
+      if (!acc[dateStr]) acc[dateStr] = [];
+      acc[dateStr].push(record);
+      return acc;
+    }, {});
+
+    let totalWorkMinutesPeriod = 0;
+    const dailySummaries = {};
+
+    for (const dateStr in dailyRecords) {
+      const summary = calculateDailySummary(dailyRecords[dateStr]);
+
+      summary.pauses.forEach(p => {
+        if (p.reason && (p.reason instanceof ObjectId || (typeof p.reason === 'string' && p.reason.length === 24))) {
+          p.reason = getPauseReasonName(String(p.reason));
+        } else {
+          p.reason = p.reason || 'Outro';
+        }
+      });
+
+      dailySummaries[dateStr] = summary;
+      totalWorkMinutesPeriod += summary.totalWorkMinutes;
+    }
+
+    // --- GERAÇÃO PDF ---
+    const doc = new PDFDocument({ margin: 30, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    const safeEmployeeName = (employee.name || 'funcionario').replace(/\s+/g, '_');
+    res.setHeader('Content-Disposition', `attachment; filename="espelho_ponto_${safeEmployeeName}_${start_date}_${end_date.toISOString().split('T')[0]}.pdf"`);
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(16).text('Espelho de Ponto', { align: 'center' });
+    doc.fontSize(10).moveDown();
+    doc.text(`Funcionário: ${employee.name || '-'}`);
+    doc.text(`Período: ${startDate.toLocaleDateString('pt-BR')} a ${new Date(end_date).toLocaleDateString('pt-BR')}`);
+    doc.text(`Departamento: ${employee.department || '-'}`);
+    doc.moveDown();
+
+    // Tabela (simples)
+    const columnWidths = [60, 60, 60, 60, 60, 200];
+
+    const drawSeparator = () => {
+      doc.strokeColor('black');
+      doc.moveTo(doc.x, doc.y).lineTo(doc.page.width - doc.options.margin, doc.y).stroke();
+      doc.moveDown(0.5);
+    };
+
+    const drawRow = (data, isHeader = false, isSummary = false) => {
+      const rowHeight = isSummary ? 20 : 15;
+
+      drawSeparator();
+
+      doc.font(isHeader ? 'Helvetica-Bold' : (isSummary ? 'Helvetica-Oblique' : 'Helvetica'));
+
+      let currentX = doc.x;
+      const yStart = doc.y;
+
+      data.forEach((text, i) => {
+        // text may be longer than column - allow wrap within width
+        doc.fontSize(8).text(String(text || ''), currentX, yStart, {
+          width: columnWidths[i],
+          align: ['left', 'center', 'center', 'center', 'center', 'left'][i]
+        });
+        currentX += columnWidths[i];
+      });
+
+      // move cursor down appropriate amount
+      doc.moveDown(rowHeight / 10);
+      doc.y += rowHeight - 6;
+      doc.font('Helvetica');
+    };
+
+    drawRow(['Data', 'Entrada', 'Pausa', 'Retorno', 'Saída', 'Total Pausa / Motivos'], true);
+
+    for (const dateStr in dailySummaries) {
+      const summary = dailySummaries[dateStr];
+      const recordsClock = summary.dailyClock || {};
+      const date = new Date(dateStr).toLocaleDateString('pt-BR');
+      const totalPauseTimeStr = minutesToTime(summary.totalPauseMinutes);
+      const totalWorkTimeStr = minutesToTime(summary.totalWorkMinutes);
+
+      const entryTime = recordsClock.entry ? new Date(recordsClock.entry).toLocaleTimeString('pt-BR').substring(0, 5) : 'FALTA';
+      const pauseTime = recordsClock.pause ? new Date(recordsClock.pause).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
+      const returnTime = recordsClock.return ? new Date(recordsClock.return).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
+      const exitTime = recordsClock.exit ? new Date(recordsClock.exit).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
+
+      drawRow([date, entryTime, pauseTime, returnTime, exitTime]);
+
+      const pauseReasonsText = summary.pauses.map(p => {
+        return `${p.reason} (${p.description || 's/ descrição'})`;
+      }).join('; ');
+
+      drawRow([
+        '',
+        `Trabalho: ${totalWorkTimeStr}`,
+        '',
+        '',
+        '',
+        `Total Pausa: ${totalPauseTimeStr} | Motivos: ${pauseReasonsText || 'Nenhuma pausa registrada'}`
+      ], false, true);
+    }
+
+    drawSeparator();
+
+    // --- RESUMO/TOTALIZAÇÃO ---
+    const diffInTime = new Date(end_date).getTime() - new Date(start_date).getTime();
+    const totalDaysPeriod = Math.ceil(diffInTime / (1000 * 3600 * 24)) + 1;
+
+    const totalWorkMinutes = totalWorkMinutesPeriod;
+    const standardHours = totalDaysPeriod * 8 * 60;
+
+    let diffMinutes = totalWorkMinutes - standardHours;
+    const totalSalary = employee.salary || 0;
+    let extraValue = 0;
+    let timeBankBalance = employee.current_time_bank || 0;
+
+    if (employee.overtime_format === 'paid_overtime') {
+      if (diffMinutes > 0) {
+        const hourlyRate = (totalSalary / 220);
+        extraValue = (diffMinutes / 60) * hourlyRate * 1.5;
+      }
+    } else {
+      timeBankBalance += diffMinutes;
+    }
+
+    const diffMinutesStr = minutesToTime(diffMinutes);
+    const timeBankBalanceStr = minutesToTime(timeBankBalance);
+
+    doc.fontSize(12).font('Helvetica-Bold').text('RESUMO DO PERÍODO', { underline: true }).moveDown(0.5);
+    doc.font('Helvetica').fontSize(10);
+    doc.text(`Horas Trabalhadas (Líquidas): ${minutesToTime(totalWorkMinutesPeriod)}`);
+    doc.text(`Horas Padrão (8h/dia, ${totalDaysPeriod} dias): ${minutesToTime(standardHours)}`);
+    doc.text(`Diferença em Relação ao Padrão: ${diffMinutesStr} ${diffMinutes > 0 ? '(Excedente)' : '(Débito)'}`);
+    doc.moveDown(0.5);
+
+    doc.text(`Formato de Excedente: ${employee.overtime_format === 'time_bank' ? 'Banco de Horas' : 'Hora Extra Paga'}`);
+
+    if (employee.overtime_format === 'time_bank') {
+      doc.font('Helvetica-Bold').text(`SALDO BANCO DE HORAS TOTAL: ${timeBankBalanceStr}`).moveDown(0.5);
+    } else {
+      doc.text(`Salário Base Mensal: R$ ${totalSalary.toFixed(2)}`);
+      if (extraValue > 0) {
+        doc.font('Helvetica-Bold').fillColor('red').text(`VALOR DE HORA EXTRA: R$ ${extraValue.toFixed(2)}`).moveDown(0.5);
+      } else {
+        doc.text(`VALOR DE HORA EXTRA: R$ 0.00`).moveDown(0.5);
+      }
+    }
+    doc.fillColor('black');
+
+    doc.end();
+
+  } catch (error) {
+    console.error('Erro ao gerar relatório PDF:', error);
+    res.status(500).json({ error: 'Erro ao gerar relatório PDF: ' + error.message });
+  }
 });
 
 app.get('/api/reports/excel', authenticateToken, requireAdmin, async (req, res) => {
-    // Lógica completa de geração de Excel (mantida da resposta anterior)
-    try {
-        const { employee_id, start_date, end_date } = req.query;
+  try {
+    const { employee_id, start_date, end_date } = req.query;
 
-        if (!employee_id || !start_date || !end_date) {
-            return res.status(400).json({ error: 'ID do funcionário e intervalo de datas são obrigatórios.' });
-        }
-        
-        const employee = await db.collection('employees').findOne({ _id: new ObjectId(employee_id) });
-        if (!employee) {
-            return res.status(404).json({ error: 'Funcionário não encontrado.' });
-        }
-
-        const startDate = new Date(start_date);
-        const endDate = new Date(end_date);
-        endDate.setDate(endDate.getDate() + 1);
-
-        const records = await db.collection('time_records').find({
-            employee_id: new ObjectId(employee_id),
-            timestamp: { $gte: startDate, $lt: endDate }
-        }).sort({ timestamp: 1 }).toArray();
-        
-        const pauseReasonsMap = await db.collection('pause_reasons').find().toArray();
-        const getPauseReasonName = (id) => {
-            const reason = pauseReasonsMap.find(r => r._id.toString() === id);
-            return reason ? reason.name : 'Motivo Desconhecido';
-        };
-
-        const dailyRecords = records.reduce((acc, record) => {
-            const dateStr = new Date(record.timestamp).toISOString().split('T')[0];
-            if (!acc[dateStr]) acc[dateStr] = [];
-            acc[dateStr].push(record);
-            return acc;
-        }, {});
-
-        let totalWorkMinutesPeriod = 0;
-        const dailySummaries = {};
-
-        for (const dateStr in dailyRecords) {
-            const summary = calculateDailySummary(dailyRecords[dateStr]);
-            
-            summary.pauses.forEach(p => {
-                if(p.reason instanceof ObjectId || (typeof p.reason === 'string' && p.reason.length === 24)) {
-                    p.reason = getPauseReasonName(p.reason.toString());
-                } else {
-                    p.reason = p.reason || 'Outro';
-                }
-            });
-            
-            dailySummaries[dateStr] = summary;
-            totalWorkMinutesPeriod += summary.totalWorkMinutes;
-        }
-
-        // --- GERAÇÃO EXCEL ---
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Espelho de Ponto');
-
-        const headerStyle = {
-            fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } },
-            font: { bold: true },
-            alignment: { vertical: 'middle', horizontal: 'center' },
-            border: { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }
-        };
-
-        // Metadata
-        worksheet.addRow(['Espelho de Ponto']);
-        worksheet.mergeCells('A1:F1');
-        worksheet.getCell('A1').font = { size: 14, bold: true };
-        worksheet.getCell('A1').alignment = { horizontal: 'center' };
-        
-        worksheet.addRow([`Funcionário: ${employee.name}`]);
-        worksheet.addRow([`Período: ${new Date(start_date).toLocaleDateString('pt-BR')} a ${new Date(req.query.end_date).toLocaleDateString('pt-BR')}`]);
-        worksheet.addRow([`Departamento: ${employee.department}`]);
-        worksheet.addRow([]);
-
-        // Table Header
-        const headers = ['Data', 'Entrada', 'Pausa', 'Retorno', 'Saída', 'Total Pausa / Motivos'];
-        const headerRow = worksheet.addRow(headers);
-        headerRow.eachCell(cell => Object.assign(cell, headerStyle));
-
-        // Table Body
-        for (const dateStr in dailySummaries) {
-            const summary = dailySummaries[dateStr];
-            const records = summary.dailyClock;
-            const date = new Date(dateStr).toLocaleDateString('pt-BR');
-            const totalPauseTimeStr = minutesToTime(summary.totalPauseMinutes);
-            const totalWorkTimeStr = minutesToTime(summary.totalWorkMinutes);
-
-            const entryTime = records.entry ? new Date(records.entry).toLocaleTimeString('pt-BR').substring(0, 5) : 'FALTA';
-            const pauseTime = records.pause ? new Date(records.pause).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
-            const returnTime = records.return ? new Date(records.return).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
-            const exitTime = records.exit ? new Date(records.exit).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
-            
-            const row1 = worksheet.addRow([date, entryTime, pauseTime, returnTime, exitTime]);
-            row1.eachCell(cell => cell.border = headerStyle.border);
-
-            const pauseReasonsText = summary.pauses.map(p => {
-                return `${p.reason} (${p.description || 's/ descrição'})`;
-            }).join('; ');
-
-            const row2 = worksheet.addRow([
-                '',
-                `Trabalho: ${totalWorkTimeStr}`,
-                '',
-                '',
-                '',
-                `Total Pausa: ${totalPauseTimeStr} | Motivos: ${pauseReasonsText || 'Nenhuma pausa registrada'}`
-            ]);
-            row2.eachCell(cell => cell.border = headerStyle.border);
-            row2.font = { italic: true };
-        }
-        
-        worksheet.columns = [
-            { width: 12 },
-            { width: 15, alignment: { horizontal: 'center' } },
-            { width: 15, alignment: { horizontal: 'center' } },
-            { width: 15, alignment: { horizontal: 'center' } },
-            { width: 15, alignment: { horizontal: 'center' } },
-            { width: 60 }
-        ];
-
-        // --- RESUMO/TOTALIZAÇÃO ---
-        worksheet.addRow([]);
-        worksheet.addRow(['RESUMO DO PERÍODO']);
-        worksheet.getCell('A' + worksheet.lastRow.number).font = { bold: true };
-
-        const totalDaysPeriod = Math.ceil((new Date(req.query.end_date).getTime() - new Date(start_date).getTime()) / (1000 * 3600 * 24)) + 1;
-        const standardHours = totalDaysPeriod * 8 * 60; 
-        let diffMinutes = totalWorkMinutesPeriod - standardHours;
-        const totalSalary = employee.salary || 0;
-        let extraValue = 0;
-        let timeBankBalance = employee.current_time_bank || 0;
-
-        if (employee.overtime_format === 'paid_overtime') {
-            if (diffMinutes > 0) {
-                const hourlyRate = (totalSalary / 220);
-                extraValue = (diffMinutes / 60) * hourlyRate * 1.5;
-            }
-        } else {
-            timeBankBalance += diffMinutes;
-        }
-        
-        const diffMinutesStr = minutesToTime(diffMinutes);
-        const timeBankBalanceStr = minutesToTime(timeBankBalance);
-        
-        worksheet.addRow([`Horas Trabalhadas (Líquidas):`, minutesToTime(totalWorkMinutesPeriod)]);
-        worksheet.addRow([`Horas Padrão (8h/dia, ${totalDaysPeriod} dias):`, minutesToTime(standardHours)]);
-        worksheet.addRow([`Diferença em Relação ao Padrão:`, `${diffMinutesStr} ${diffMinutes > 0 ? '(Excedente)' : '(Débito)'}`]);
-        worksheet.addRow([]);
-        
-        worksheet.addRow([`Formato de Excedente:`, employee.overtime_format === 'time_bank' ? 'Banco de Horas' : 'Hora Extra Paga']);
-        
-        if (employee.overtime_format === 'time_bank') {
-            worksheet.addRow(['SALDO BANCO DE HORAS TOTAL:', timeBankBalanceStr]).getCell('A' + worksheet.lastRow.number).font = { bold: true };
-        } else {
-            worksheet.addRow(['Salário Base Mensal:', `R$ ${totalSalary.toFixed(2)}`]);
-            const extraRow = worksheet.addRow(['VALOR DE HORA EXTRA:', `R$ ${extraValue.toFixed(2)}`]);
-            extraRow.getCell('A' + extraRow.number).font = { bold: true };
-            extraRow.getCell('B' + extraRow.number).font = { color: { argb: 'FFFF0000' } };
-        }
-
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="relatorio_ponto_${employee.name.replace(/\s/g, '_')}_${start_date}_${req.query.end_date}.xlsx"`);
-
-        await workbook.xlsx.write(res);
-        res.end();
-
-    } catch (error) {
-        console.error('Erro ao gerar relatório Excel:', error);
-        res.status(500).json({ error: 'Erro ao gerar relatório Excel: ' + error.message });
+    if (!employee_id || !start_date || !end_date) {
+      return res.status(400).json({ error: 'ID do funcionário e intervalo de datas são obrigatórios.' });
     }
-});
 
+    const employee = await db.collection('employees').findOne({ _id: toObjectIdSafe(String(employee_id)) });
+    if (!employee) {
+      return res.status(404).json({ error: 'Funcionário não encontrado.' });
+    }
+
+    const startDate = new Date(start_date);
+    const endDate = new Date(end_date);
+    endDate.setDate(endDate.getDate() + 1);
+
+    const records = await db.collection('time_records').find({
+      employee_id: toObjectIdSafe(String(employee_id)),
+      timestamp: { $gte: startDate, $lt: endDate }
+    }).sort({ timestamp: 1 }).toArray();
+
+    const pauseReasonsMap = await db.collection('pause_reasons').find().toArray();
+    const getPauseReasonName = (id) => {
+      const reason = pauseReasonsMap.find(r => r._id.toString() === (String(id)));
+      return reason ? reason.name : 'Motivo Desconhecido';
+    };
+
+    const dailyRecords = records.reduce((acc, record) => {
+      const dateStr = new Date(record.timestamp).toISOString().split('T')[0];
+      if (!acc[dateStr]) acc[dateStr] = [];
+      acc[dateStr].push(record);
+      return acc;
+    }, {});
+
+    let totalWorkMinutesPeriod = 0;
+    const dailySummaries = {};
+
+    for (const dateStr in dailyRecords) {
+      const summary = calculateDailySummary(dailyRecords[dateStr]);
+
+      summary.pauses.forEach(p => {
+        if (p.reason && (p.reason instanceof ObjectId || (typeof p.reason === 'string' && p.reason.length === 24))) {
+          p.reason = getPauseReasonName(String(p.reason));
+        } else {
+          p.reason = p.reason || 'Outro';
+        }
+      });
+
+      dailySummaries[dateStr] = summary;
+      totalWorkMinutesPeriod += summary.totalWorkMinutes;
+    }
+
+    // --- GERAÇÃO EXCEL ---
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Espelho de Ponto');
+
+    const headerStyle = {
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } },
+      font: { bold: true },
+      alignment: { vertical: 'middle', horizontal: 'center' },
+      border: { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }
+    };
+
+    // Metadata
+    worksheet.addRow(['Espelho de Ponto']);
+    worksheet.mergeCells('A1:F1');
+    worksheet.getCell('A1').font = { size: 14, bold: true };
+    worksheet.getCell('A1').alignment = { horizontal: 'center' };
+
+    worksheet.addRow([`Funcionário: ${employee.name}`]);
+    worksheet.addRow([`Período: ${startDate.toLocaleDateString('pt-BR')} a ${new Date(end_date).toLocaleDateString('pt-BR')}`]);
+    worksheet.addRow([`Departamento: ${employee.department}`]);
+    worksheet.addRow([]);
+
+    // Table Header
+    const headers = ['Data', 'Entrada', 'Pausa', 'Retorno', 'Saída', 'Total Pausa / Motivos'];
+    const headerRow = worksheet.addRow(headers);
+    headerRow.eachCell(cell => Object.assign(cell, headerStyle));
+
+    // Table Body
+    for (const dateStr in dailySummaries) {
+      const summary = dailySummaries[dateStr];
+      const recordsClock = summary.dailyClock || {};
+      const date = new Date(dateStr).toLocaleDateString('pt-BR');
+      const totalPauseTimeStr = minutesToTime(summary.totalPauseMinutes);
+      const totalWorkTimeStr = minutesToTime(summary.totalWorkMinutes);
+
+      const entryTime = recordsClock.entry ? new Date(recordsClock.entry).toLocaleTimeString('pt-BR').substring(0, 5) : 'FALTA';
+      const pauseTime = recordsClock.pause ? new Date(recordsClock.pause).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
+      const returnTime = recordsClock.return ? new Date(recordsClock.return).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
+      const exitTime = recordsClock.exit ? new Date(recordsClock.exit).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
+
+      const row1 = worksheet.addRow([date, entryTime, pauseTime, returnTime, exitTime]);
+      row1.eachCell(cell => cell.border = headerStyle.border);
+
+      const pauseReasonsText = summary.pauses.map(p => {
+        return `${p.reason} (${p.description || 's/ descrição'})`;
+      }).join('; ');
+
+      const row2 = worksheet.addRow([
+        '',
+        `Trabalho: ${totalWorkTimeStr}`,
+        '',
+        '',
+        '',
+        `Total Pausa: ${totalPauseTimeStr} | Motivos: ${pauseReasonsText || 'Nenhuma pausa registrada'}`
+      ]);
+      row2.eachCell(cell => cell.border = headerStyle.border);
+      row2.font = { italic: true };
+    }
+
+    worksheet.columns = [
+      { width: 12 },
+      { width: 15, alignment: { horizontal: 'center' } },
+      { width: 15, alignment: { horizontal: 'center' } },
+      { width: 15, alignment: { horizontal: 'center' } },
+      { width: 15, alignment: { horizontal: 'center' } },
+      { width: 60 }
+    ];
+
+    // --- RESUMO/TOTALIZAÇÃO ---
+    worksheet.addRow([]);
+    worksheet.addRow(['RESUMO DO PERÍODO']);
+    worksheet.getCell('A' + worksheet.lastRow.number).font = { bold: true };
+
+    const totalDaysPeriod = Math.ceil((new Date(end_date).getTime() - new Date(start_date).getTime()) / (1000 * 3600 * 24)) + 1;
+    const standardHours = totalDaysPeriod * 8 * 60;
+    let diffMinutes = totalWorkMinutesPeriod - standardHours;
+    const totalSalary = employee.salary || 0;
+    let extraValue = 0;
+    let timeBankBalance = employee.current_time_bank || 0;
+
+    if (employee.overtime_format === 'paid_overtime') {
+      if (diffMinutes > 0) {
+        const hourlyRate = (totalSalary / 220);
+        extraValue = (diffMinutes / 60) * hourlyRate * 1.5;
+      }
+    } else {
+      timeBankBalance += diffMinutes;
+    }
+
+    const diffMinutesStr = minutesToTime(diffMinutes);
+    const timeBankBalanceStr = minutesToTime(timeBankBalance);
+
+    worksheet.addRow([`Horas Trabalhadas (Líquidas):`, minutesToTime(totalWorkMinutesPeriod)]);
+    worksheet.addRow([`Horas Padrão (8h/dia, ${totalDaysPeriod} dias):`, minutesToTime(standardHours)]);
+    worksheet.addRow([`Diferença em Relação ao Padrão:`, `${diffMinutesStr} ${diffMinutes > 0 ? '(Excedente)' : '(Débito)'}`]);
+    worksheet.addRow([]);
+
+    worksheet.addRow([`Formato de Excedente:`, employee.overtime_format === 'time_bank' ? 'Banco de Horas' : 'Hora Extra Paga']);
+
+    if (employee.overtime_format === 'time_bank') {
+      worksheet.addRow(['SALDO BANCO DE HORAS TOTAL:', timeBankBalanceStr]).getCell('A' + worksheet.lastRow.number).font = { bold: true };
+    } else {
+      worksheet.addRow(['Salário Base Mensal:', `R$ ${totalSalary.toFixed(2)}`]);
+      const extraRow = worksheet.addRow(['VALOR DE HORA EXTRA:', `R$ ${extraValue.toFixed(2)}`]);
+      extraRow.getCell('A' + extraRow.number).font = { bold: true };
+      extraRow.getCell('B' + extraRow.number).font = { color: { argb: 'FFFF0000' } };
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    const safeEmpName = (employee.name || 'funcionario').replace(/\s+/g, '_');
+    res.setHeader('Content-Disposition', `attachment; filename="relatorio_ponto_${safeEmpName}_${start_date}_${end_date.toISOString().split('T')[0]}.xlsx"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (error) {
+    console.error('Erro ao gerar relatório Excel:', error);
+    res.status(500).json({ error: 'Erro ao gerar relatório Excel: ' + error.message });
+  }
+});
 
 // --- INICIALIZAÇÃO DO SERVIDOR ---
 const startServer = async () => {
