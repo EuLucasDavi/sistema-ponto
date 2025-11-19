@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -15,7 +15,8 @@ const EmployeeDashboard = () => {
   const [pauseReasons, setPauseReasons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [registerLoading, setRegisterLoading] = useState(false);
-  const [lastRecordType, setLastRecordType] = useState(undefined);
+  // 💡 CORREÇÃO 1: Inicializado como undefined para controle de loading.
+  const [lastRecordType, setLastRecordType] = useState(undefined); 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastRecord, setLastRecord] = useState(null);
 
@@ -49,8 +50,9 @@ const EmployeeDashboard = () => {
     setEmployeeData(null);
     setRecentRecords([]);
     setTodayRecordsList([]);
-    setLastRecordType(undefined);
     setMyRequests([]);
+    // Reinicia lastRecordType para undefined no reset
+    setLastRecordType(undefined); 
   };
 
   const closeAllModals = () => {
@@ -115,26 +117,17 @@ const EmployeeDashboard = () => {
     });
 
     setTodayRecordsList(response.data);
-
+    
+    // 💡 CORREÇÃO 3: Atualiza lastRecordType para uso nos textos dos botões
     if (response.data.length > 0) {
-      const lastRecordToday = response.data[response.data.length - 1];
-      setLastRecordType(lastRecordToday.type);
+      // Usa o índice 0, pois o backend ordena do mais novo para o mais antigo.
+      setLastRecordType(response.data[0].type); 
     } else {
-      setLastRecordType(null);
+      setLastRecordType(null); // Nenhum registro hoje
     }
   };
 
-  const getAvailableActions = () => {
-    if (todayRecordsList.length - 1) {
-      return ['entry'];
-    }
-
-    const last = todayRecordsList[todayRecordsList.length - 1].type;
-
-    if (last === 'entry') return ['pause', 'exit'];
-    if (last === 'pause') return ['entry'];
-    return ['entry'];
-  };
+  // Removida a função getAvailableActions obsoleta, mantendo apenas o useMemo.
 
   const registerTime = async (type, pauseReason = null) => {
     setRegisterLoading(true);
@@ -142,14 +135,17 @@ const EmployeeDashboard = () => {
       if (type === 'pause' && pauseReason) {
         await axios.post('/api/me/time-records-with-reason', {
           type,
-          pause_reason_id: pauseReason.reason === 'outro' ? null : pauseReason.reason,
+          // Verifica se 'outro' foi selecionado para não enviar pause_reason_id
+          pause_reason_id: pauseReason.reason === 'outro' ? null : pauseReason.reason, 
           custom_reason: pauseReason.description
         });
       } else {
         await axios.post('/api/me/time-records', { type });
       }
 
-      await fetchAllData();
+      // Re-fetch para atualizar a lista e o availableActions
+      // O fetchAllData irá chamar fetchTodayRecords, que agora usa o índice 0.
+      await fetchAllData(); 
 
       setLastRecord({
         type,
@@ -163,7 +159,8 @@ const EmployeeDashboard = () => {
       showSuccessMessage('Registro Confirmado', `${actionNames[type]} registrada com sucesso às ${new Date().toLocaleTimeString('pt-BR')}`);
 
     } catch (error) {
-      await fetchTodayRecords();
+      // Re-fetch específico em caso de erro para garantir a atualização
+      await fetchTodayRecords(); 
       showErrorMessage('Erro no Registro', error.response?.data?.error || 'Erro ao registrar ponto');
     } finally {
       setRegisterLoading(false);
@@ -222,10 +219,24 @@ const EmployeeDashboard = () => {
     );
   };
 
-  const availableActions = getAvailableActions(lastRecordType);
+  const availableActions = useMemo(() => {
+    if (!todayRecordsList || todayRecordsList.length === 0) {
+      return ['entry'];
+    }
+
+    // 💡 CORREÇÃO CRÍTICA (2): Usa o índice 0, que é o registro mais recente retornado pelo backend.
+    const last = todayRecordsList[0].type; 
+
+    // Lógica correta: Entrada -> Pausa/Saída -> Pausa -> Reentrada
+    if (last === 'entry') return ['pause', 'exit'];
+    if (last === 'pause') return ['entry'];
+    return ['entry'];
+  }, [todayRecordsList]);
+
   const pendingRequestsCount = myRequests.filter(req => req.status === 'pending').length;
 
-  if (loading || lastRecordType === undefined) {
+  // 💡 CORREÇÃO 4: O loading espera que lastRecordType tenha um valor (diferente de undefined)
+  if (loading || lastRecordType === undefined) { 
     return (
       <div className="loading-container">
         <div className="loading">Carregando seus dados...</div>
@@ -293,6 +304,7 @@ const EmployeeDashboard = () => {
               </div>
 
               <div className="time-buttons">
+                {/* A lógica do availableActions agora está correta */}
                 {availableActions.includes('entry') && (
                   <button
                     className="btn btn-success btn-large"
@@ -386,6 +398,7 @@ const EmployeeDashboard = () => {
                     <h5>Seus Registros de Hoje</h5>
                   </div>
                   <div className="today-records-list">
+                    {/* A lista será exibida do mais novo para o mais antigo, como vem do backend */}
                     {todayRecordsList.map(record => (
                       <div key={record._id} className="today-record-item">
                         <span className={`record-badge ${record.type}`}>
@@ -490,18 +503,19 @@ const EmployeeDashboard = () => {
                     </select>
                   </div>
 
-                  {pauseForm.reason === 'outro' && (
+                  {/* 💡 CORREÇÃO 5: Lógica de validação do input de descrição: só é obrigatório para 'outro' e aparece se 'outro' for selecionado */}
+                  {(pauseForm.reason === 'outro') && (
                     <div className="form-group">
                       <label>Descrição *</label>
                       <input
                         type="text"
                         value={pauseForm.description}
                         onChange={(e) => setPauseForm({ ...pauseForm, description: e.target.value })}
-                        required
+                        required={pauseForm.reason === 'outro'}
                       />
                     </div>
                   )}
-
+                  
                   {pauseForm.reason !== 'outro' && pauseForm.reason !== '' && (
                     <div className="form-group">
                       <label>Observações adicionais</label>
@@ -517,7 +531,8 @@ const EmployeeDashboard = () => {
                   <button className="btn btn-secondary" onClick={() => setShowPauseModal(false)}>Cancelar</button>
                   <button
                     className="btn btn-primary"
-                    disabled={!pauseForm.reason || registerLoading}
+                    // 💡 CORREÇÃO 6: Validação do botão: requer motivo OU se for "outro", requer descrição
+                    disabled={!pauseForm.reason || (pauseForm.reason === 'outro' && !pauseForm.description) || registerLoading}
                     onClick={() => registerTime('pause', pauseForm)}
                   >
                     <FiPauseCircle size={16} />
@@ -650,7 +665,7 @@ const EmployeeDashboard = () => {
                             <div className="request-date">
                               {new Date(request.date).toLocaleDateString('pt-BR')}
                               {request.requested_time && (
-                                <span> às {new Date(request.requested_time).toLocaleTimeString('pt-BR')}</span>
+                                <span> às {request.requested_time}</span>
                               )}
                             </div>
                           </div>
