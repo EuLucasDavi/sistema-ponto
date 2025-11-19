@@ -15,8 +15,7 @@ const EmployeeDashboard = () => {
   const [pauseReasons, setPauseReasons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [registerLoading, setRegisterLoading] = useState(false);
-  // 💡 CORREÇÃO 1: Inicializado como undefined para controle de loading.
-  const [lastRecordType, setLastRecordType] = useState(undefined); 
+  const [lastRecordType, setLastRecordType] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastRecord, setLastRecord] = useState(null);
 
@@ -52,7 +51,7 @@ const EmployeeDashboard = () => {
     setTodayRecordsList([]);
     setMyRequests([]);
     // Reinicia lastRecordType para undefined no reset
-    setLastRecordType(undefined); 
+    setLastRecordType(undefined);
   };
 
   const closeAllModals = () => {
@@ -117,11 +116,11 @@ const EmployeeDashboard = () => {
     });
 
     setTodayRecordsList(response.data);
-    
+
     // 💡 CORREÇÃO 3: Atualiza lastRecordType para uso nos textos dos botões
     if (response.data.length > 0) {
-      // Usa o índice 0, pois o backend ordena do mais novo para o mais antigo.
-      setLastRecordType(response.data[0].type); 
+      const lastRecord = response.data[response.data.length - 1];
+      setLastRecordType(lastRecord.type);
     } else {
       setLastRecordType(null); // Nenhum registro hoje
     }
@@ -136,7 +135,7 @@ const EmployeeDashboard = () => {
         await axios.post('/api/me/time-records-with-reason', {
           type,
           // Verifica se 'outro' foi selecionado para não enviar pause_reason_id
-          pause_reason_id: pauseReason.reason === 'outro' ? null : pauseReason.reason, 
+          pause_reason_id: pauseReason.reason === 'outro' ? null : pauseReason.reason,
           custom_reason: pauseReason.description
         });
       } else {
@@ -145,7 +144,7 @@ const EmployeeDashboard = () => {
 
       // Re-fetch para atualizar a lista e o availableActions
       // O fetchAllData irá chamar fetchTodayRecords, que agora usa o índice 0.
-      await fetchAllData(); 
+      await fetchAllData();
 
       setLastRecord({
         type,
@@ -160,7 +159,7 @@ const EmployeeDashboard = () => {
 
     } catch (error) {
       // Re-fetch específico em caso de erro para garantir a atualização
-      await fetchTodayRecords(); 
+      await fetchTodayRecords();
       showErrorMessage('Erro no Registro', error.response?.data?.error || 'Erro ao registrar ponto');
     } finally {
       setRegisterLoading(false);
@@ -220,12 +219,12 @@ const EmployeeDashboard = () => {
   };
 
   const availableActions = useMemo(() => {
-    if (!todayRecordsList || todayRecordsList.length - 1) {
+    if (!todayRecordsList || todayRecordsList.length === 0) {
       return ['entry'];
     }
 
     // 💡 CORREÇÃO CRÍTICA (2): Usa o índice 0, que é o registro mais recente retornado pelo backend.
-    const last = todayRecordsList[0].type; 
+    const last = todayRecordsList[todayRecordsList.length - 1].type;
 
     // Lógica correta: Entrada -> Pausa/Saída -> Pausa -> Reentrada
     if (last === 'entry') return ['pause', 'exit'];
@@ -236,7 +235,7 @@ const EmployeeDashboard = () => {
   const pendingRequestsCount = myRequests.filter(req => req.status === 'pending').length;
 
   // 💡 CORREÇÃO 4: O loading espera que lastRecordType tenha um valor (diferente de undefined)
-  if (loading || lastRecordType === undefined) { 
+  if (loading || lastRecordType) {
     return (
       <div className="loading-container">
         <div className="loading">Carregando seus dados...</div>
@@ -515,7 +514,7 @@ const EmployeeDashboard = () => {
                       />
                     </div>
                   )}
-                  
+
                   {pauseForm.reason !== 'outro' && pauseForm.reason !== '' && (
                     <div className="form-group">
                       <label>Observações adicionais</label>
