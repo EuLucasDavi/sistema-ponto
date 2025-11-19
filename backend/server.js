@@ -772,6 +772,23 @@ app.get('/api/pause-reasons', authenticateToken, requireEmployee, async (req, re
     }
 });
 
+app.post('/api/pause-reasons', authenticateToken, requireAdmin, async (req, res) => {
+  const { name, description } = req.body;
+
+  try {
+    const result = await db.collection('pause_reasons').insertOne({
+      name,
+      description,
+      created_at: new Date()
+    });
+
+    const newReason = await db.collection('pause_reasons').findOne({ _id: result.insertedId });
+    res.status(201).json(newReason);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.put('/api/pause-reasons/:id', authenticateToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { name, description } = req.body;
