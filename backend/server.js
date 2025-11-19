@@ -34,21 +34,15 @@ let mongoClient;
 // --- FUNÇÕES DE SETUP E UTILS (Início) ---
 
 const connectToMongoDB = async () => {
-  if (db) return; // Já conectado
-
-  const uri = process.env.MONGODB_URI;
-  if (!uri) {
-    throw new Error("A variável MONGODB_URI não está definida no .env");
-  }
-
   try {
-    mongoClient = new MongoClient(uri);
+    console.log('🔗 Conectando ao MongoDB...');
+
+    mongoClient = new MongoClient(process.env.MONGODB_URI);
     await mongoClient.connect();
-    db = mongoClient.db(process.env.DB_NAME || 'sistema_ponto');
-    console.log('✅ Conectado ao MongoDB.');
-    
-    // Criação de Índices
-    await db.collection('users').createIndex({ email: 1 }, { unique: true });
+    db = mongoClient.db('sistema_ponto');
+    console.log('✅ Conectado ao MongoDB Atlas com sucesso!');
+
+    await db.collection('users').createIndex({ username: 1 }, { unique: true });
     await db.collection('employees').createIndex({ email: 1 }, { unique: true });
     await db.collection('time_records').createIndex({ employee_id: 1, timestamp: 1 });
     await db.collection('pause_reasons').createIndex({ name: 1 }, { unique: true });
@@ -56,10 +50,8 @@ const connectToMongoDB = async () => {
     await db.collection('requests').createIndex({ status: 1 });
 
     await createDefaultAdmin();
-
   } catch (error) {
-    console.error('❌ Erro ao conectar ao MongoDB:', error);
-    process.exit(1);
+    console.error('❌ Erro ao conectar com MongoDB:', error.message);
   }
 };
 
