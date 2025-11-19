@@ -857,7 +857,7 @@ const EmployeeDashboard = () => {
           )}
         </>
       ) : (
-        <div className="employee-info-card error-card">
+        <div className="info-card error-card">
           <div className="section-header">
             <FiAlertCircle size={24} />
             <h3>Funcionário Não Vinculado</h3>

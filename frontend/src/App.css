@@ -2398,7 +2398,8 @@ body {
   padding: 20px;
 }
 
-.modal {
+.modal,
+.modal-content {
   background: white;
   border-radius: 12px;
   width: 100%;
