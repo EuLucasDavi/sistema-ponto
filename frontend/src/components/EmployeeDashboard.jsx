@@ -4,8 +4,13 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   FiUser, FiClock, FiCalendar, FiBriefcase, FiLogIn, FiLogOut,
   FiCheckCircle, FiAlertCircle, FiInfo, FiArrowRight, FiHome,
-  FiTrendingUp, FiPauseCircle, FiWatch, FiX, FiFileText, FiCheck, FiEye, FiUserPlus, FiEdit2, FiSave
+  FiTrendingUp, FiPauseCircle, FiWatch, FiX, FiFileText, FiSave, FiEye
 } from 'react-icons/fi';
+
+// Funções de formatação (adicionadas/completadas para o componente funcionar)
+const formatTime = (dateString) => new Date(dateString).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const formatDate = (dateString) => new Date(dateString).toLocaleDateString('pt-BR');
+
 
 const EmployeeDashboard = () => {
   const [employeeData, setEmployeeData] = useState(null);
@@ -94,10 +99,15 @@ const EmployeeDashboard = () => {
   };
 
   const fetchEmployeeData = async () => {
-    const response = await axios.get('/api/dashboard/stats');
-    if (response.data.role === 'employee') {
-      setEmployeeData(response.data.employee);
-      setRecentRecords(response.data.recentRecords || []);
+    try {
+      const response = await axios.get('/api/dashboard/stats');
+      if (response.data.role === 'employee') {
+        setEmployeeData(response.data.employee);
+        setRecentRecords(response.data.recentRecords || []);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar dados do funcionário:', err);
+      // Aqui você pode tratar o erro, talvez definindo employeeData como null ou mostrando uma mensagem.
     }
   };
 
@@ -135,8 +145,8 @@ const EmployeeDashboard = () => {
       return [];
     }
 
-    if (lastRecordType === null) {
-      // Nenhum registro hoje
+    if (lastRecordType === null || lastRecordType === 'exit') {
+      // Nenhum registro hoje ou após uma saída
       return ['entry'];
     }
 
@@ -147,9 +157,6 @@ const EmployeeDashboard = () => {
       case 'pause':
         // Após Pausa, só pode Retornar (chamado de 'return' no frontend, que é 'entry' no backend)
         return ['return'];
-      case 'exit':
-        // Após Saída, o dia está encerrado. Permite nova 'entry' para novo turno, se necessário.
-        return ['entry'];
       default:
         return [];
     }
@@ -276,283 +283,318 @@ const EmployeeDashboard = () => {
   };
   
   const pendingRequestsCount = myRequests.filter(r => r.status === 'pending').length;
-  
-  // Funções de formatação
-  const formatTime = (date) => new Date(date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  const formatDateTime = (date) => new Date(date).toLocaleDateString('pt-BR') + ' ' + formatTime(date);
-  
+
+  // Helper function to render action buttons (Usando classes do App.css: .btn-large)
+  const renderTimeActionButton = (action) => {
+    switch (action) {
+      case 'entry':
+        return (
+          <button key="entry" className="btn btn-primary btn-large" onClick={() => handleRegisterRecord('entry')} disabled={registerLoading}>
+            <FiLogIn size={20} />
+            {registerLoading ? 'Registrando...' : 'Registrar Entrada'}
+          </button>
+        );
+      case 'exit':
+        return (
+          <button key="exit" className="btn btn-danger btn-large" onClick={() => handleRegisterRecord('exit')} disabled={registerLoading}>
+            <FiLogOut size={20} />
+            {registerLoading ? 'Registrando...' : 'Registrar Saída'}
+          </button>
+        );
+      case 'pause':
+        return (
+          <button key="pause" className="btn btn-warning btn-large" onClick={() => handleRegisterRecord('pause')} disabled={registerLoading}>
+            <FiPauseCircle size={20} />
+            {registerLoading ? 'Registrando...' : 'Registrar Pausa'}
+          </button>
+        );
+      case 'return':
+        return (
+          <button key="return" className="btn btn-success btn-large" onClick={() => handleRegisterRecord('return')} disabled={registerLoading}>
+            <FiCheckCircle size={20} />
+            {registerLoading ? 'Registrando...' : 'Registrar Retorno'}
+          </button>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Helper function to display record type badge (Usando classes do App.css: .record-type)
   const getRecordBadge = (type) => {
-    const config = {
-      entry: { class: 'success', text: 'Entrada/Retorno', icon: <FiLogIn size={14} /> },
-      pause: { class: 'warning', text: 'Pausa', icon: <FiPauseCircle size={14} /> },
-      exit: { class: 'danger', text: 'Saída', icon: <FiLogOut size={14} /> }
-    }[type] || { class: 'secondary', text: 'Desconhecido', icon: <FiInfo size={14} /> };
+    const typeConfig = {
+      entry: { class: 'entry', text: 'Entrada/Retorno', icon: <FiLogIn size={14} /> },
+      exit: { class: 'exit', text: 'Saída', icon: <FiLogOut size={14} /> },
+      pause: { class: 'pause', text: 'Pausa', icon: <FiPauseCircle size={14} /> },
+    };
+    
+    const config = typeConfig[type] || { class: 'secondary', text: 'Ponto', icon: <FiClock size={14} /> };
+    
     return (
-      <span className={`badge badge-${config.class}`}>
-        {config.icon} <span style={{ marginLeft: '4px' }}>{config.text}</span>
+      <span className={`record-type ${config.class}`}>
+        {config.icon}
+        {config.text}
       </span>
     );
   };
-  
-  const getTypeBadge = (type, status) => {
-    const config = { 
-        absence: { class: 'info', text: 'Ausência', icon: <FiCalendar size={14} /> }, 
-        time_record: { class: 'primary', text: 'Registro de Ponto', icon: <FiWatch size={14} /> } 
-    }[type];
+
+  // Helper function to display request type/status badges (Usando classes do App.css: .badge)
+  const renderRequestBadges = (type, status) => {
+    let config = { type: type, text: 'Solicitação', icon: <FiFileText size={14} /> };
     
-    let statusConfig = {};
-    switch(status) {
-        case 'pending': statusConfig = { class: 'warning', text: 'Pendente', icon: <FiAlertCircle size={14} /> }; break;
-        case 'approved': statusConfig = { class: 'success', text: 'Aprovada', icon: <FiCheckCircle size={14} /> }; break;
-        case 'rejected': statusConfig = { class: 'danger', text: 'Rejeitada', icon: <FiX size={14} /> }; break;
-        default: statusConfig = { class: 'secondary', text: 'Status Desconhecido', icon: <FiInfo size={14} /> };
+    switch (type) {
+      case 'absence':
+        config = { class: 'info', text: 'Ausência', icon: <FiCalendar size={14} /> };
+        break;
+      case 'time_record':
+        config = { class: 'primary', text: 'Ajuste de Ponto', icon: <FiClock size={14} /> };
+        break;
+      default:
+        config = { class: 'secondary', text: 'Outros', icon: <FiInfo size={14} /> };
     }
-    
+
+    let statusConfig = {};
+    switch (status) {
+      case 'pending':
+        statusConfig = { class: 'warning', text: 'Pendente', icon: <FiAlertCircle size={14} /> };
+        break;
+      case 'approved':
+        statusConfig = { class: 'success', text: 'Aprovada', icon: <FiCheckCircle size={14} /> };
+        break;
+      case 'rejected':
+        statusConfig = { class: 'danger', text: 'Rejeitada', icon: <FiX size={14} /> };
+        break;
+      default:
+        statusConfig = { class: 'secondary', text: 'Status Desconhecido', icon: <FiInfo size={14} /> };
+    }
+
     return (
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
         <span className={`badge badge-${config.class}`}>
-          {config.icon} <span style={{ marginLeft: '4px' }}>{config.text}</span>
+          {config.icon}
+          <span style={{ marginLeft: '4px' }}>{config.text}</span>
         </span>
         <span className={`badge badge-${statusConfig.class}`}>
-          {statusConfig.icon} <span style={{ marginLeft: '4px' }}>{statusConfig.text}</span>
+          {statusConfig.icon}
+          <span style={{ marginLeft: '4px' }}>{statusConfig.text}</span>
         </span>
       </div>
     );
   };
-
-  const getStatusClass = (status) => {
-    if (status === 'approved') return 'status-approved';
-    if (status === 'rejected') return 'status-rejected';
-    return 'status-pending';
-  };
-
+  
   if (loading || lastRecordType === undefined) {
     return (
-      <div className="container" style={{ textAlign: 'center', padding: '50px' }}>
-        <FiClock size={40} className="spin-icon" style={{ color: '#007bff' }} />
-        <h2>Carregando Dashboard...</h2>
-        <p>Aguarde enquanto buscamos seus dados.</p>
+      <div className="loading-page">
+        <div className="empty-content">
+          <FiClock size={60} className="loading-spinner" style={{ width: '60px', height: '60px', border: '6px solid #007bff', borderTopColor: 'transparent', margin: '0' }} />
+          <h3>Carregando Dashboard...</h3>
+          <p>Aguarde enquanto buscamos seus dados.</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="container">
-      <div className="header">
-        <div className="header-title">
-          <FiHome className="header-icon" size={32} />
-          <div>
-            <h1>Dashboard do Funcionário</h1>
-            <p className="text-muted">Bem-vindo(a), {employeeData?.name || user.email}.</p>
-          </div>
-        </div>
-        <div className="current-time-box">
-          <FiClock size={20} />
-          <span>{currentTime.toLocaleTimeString('pt-BR')}</span>
-        </div>
-      </div>
-
       {employeeData ? (
         <>
-          {/* Seção de Mensagens */}
-          {showErrorModal && <Modal type="error" content={modalContent} onClose={closeAllModals} />}
-          {showSuccessModal && <Modal type="success" content={modalContent} onClose={closeAllModals} />}
-
-          {/* Card de Ações de Ponto */}
-          <div className="time-record-card card">
-            <div className="section-header">
-              <FiClock size={24} />
-              <h3>Registro de Ponto</h3>
+          {/* Cabeçalho Principal */}
+          <div className="header">
+            <div className="header-title">
+              <FiHome className="header-icon" size={32} />
+              <div>
+                <h1>Dashboard do Funcionário</h1>
+                <p className="text-muted">Bem-vindo(a), {employeeData?.name || user.email}.</p>
+              </div>
             </div>
-            
-            <div className="quick-actions">
-              {availableActions.includes('entry') && (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => handleRegisterRecord('entry')}
-                  disabled={registerLoading}
-                >
-                  <FiLogIn size={16} />
-                  {registerLoading ? 'Registrando...' : 'Entrada (Início do Dia/Turno)'}
-                </button>
-              )}
-              
-              {availableActions.includes('return') && (
-                <button
-                  className="btn btn-success"
-                  onClick={() => handleRegisterRecord('return')}
-                  disabled={registerLoading}
-                >
-                  <FiCheckCircle size={16} />
-                  {registerLoading ? 'Registrando...' : 'Retornar do Almoço/Pausa'}
-                </button>
-              )}
-
-              {availableActions.includes('pause') && (
-                <button
-                  className="btn btn-warning"
-                  onClick={() => handleRegisterRecord('pause')}
-                  disabled={registerLoading}
-                >
-                  <FiPauseCircle size={16} />
-                  {registerLoading ? 'Registrando...' : 'Pausa (Almoço/Outro)'}
-                </button>
-              )}
-
-              {availableActions.includes('exit') && (
-                <button
-                  className="btn btn-danger"
-                  onClick={() => handleRegisterRecord('exit')}
-                  disabled={registerLoading}
-                >
-                  <FiLogOut size={16} />
-                  {registerLoading ? 'Registrando...' : 'Saída (Fim do Expediente)'}
-                </button>
-              )}
-              
-              {/* Mensagem de estado finalizado */}
-              {availableActions.length === 0 && lastRecordType === 'exit' && (
-                <button className="btn btn-secondary" disabled>
-                  <FiAlertCircle size={16} />
-                  Dia Encerrado
-                </button>
-              )}
-              {/* Estado de loading inicial ou sem ação disponível */}
-              {availableActions.length === 0 && lastRecordType === undefined && (
-                <button className="btn btn-secondary" disabled>
-                  <FiInfo size={16} />
-                  Carregando Ações
-                </button>
-              )}
-            </div>
-
-            <div className="time-record-info">
-              <FiInfo size={16} />
-              <p>Último registro de ponto: {lastRecord ? `${getRecordBadge(lastRecord.type)} às ${formatTime(lastRecord.timestamp)}` : 'Nenhum registro hoje.'}</p>
+            {/* Relógio Atual como um badge */}
+            <div className="badge badge-secondary">
+              <FiClock size={16} />
+              <span>{currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
           </div>
-          
-          {/* Cartões de Informação e Resumo */}
-          <div className="dashboard-grid">
+
+          {/* Seção de Controle de Ponto e Ações Rápidas */}
+          <div className="time-clock-container">
+            {/* Card de Controle de Ponto */}
+            <div className="time-clock-card">
+              <div className="section-header">
+                <FiWatch size={24} />
+                <h3>Registro de Ponto</h3>
+              </div>
+              
+              {/* Display de Hora Atual */}
+              <div className="current-time">
+                <div className="time-display">{currentTime.toLocaleTimeString('pt-BR')}</div>
+                <div className="date-display">{currentTime.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+              </div>
+
+              {/* Botões de Ação */}
+              <div className="time-buttons">
+                {registerLoading ? (
+                  <button className="btn btn-secondary btn-large" disabled>
+                    <span className="loading-spinner" style={{ width: '20px', height: '20px', border: '2px solid white', borderTopColor: 'transparent' }}></span> 
+                    Carregando Ações
+                  </button>
+                ) : (
+                  availableActions.length > 0 ? (
+                    availableActions.map(action => renderTimeActionButton(action))
+                  ) : (
+                    <div className="info-card error-card" style={{ gridColumn: '1 / -1', margin: '0', padding: '15px 20px' }}>
+                      <p className="text-muted" style={{ margin: '0', fontStyle: 'normal' }}>
+                        <FiCheckCircle size={16} style={{ color: '#28a745', marginRight: '5px' }} />
+                        Seu dia parece completo.
+                      </p>
+                    </div>
+                  )
+                )}
+              </div>
+              
+              {/* Último Registro */}
+              <div className="last-record-card">
+                <p className="text-muted" style={{ margin: '0' }}>
+                  <FiInfo size={16} style={{ marginRight: '5px' }} />
+                  Último registro de ponto: {lastRecord ? (
+                    <>
+                      {getRecordBadge(lastRecord.type)} às **{formatTime(lastRecord.timestamp)}**
+                      {lastRecord.reason && <span className="text-muted" style={{ marginLeft: '10px' }}>(Motivo: {lastRecord.reason})</span>}
+                    </>
+                  ) : 'Nenhum registro hoje.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Card de Ações Rápidas */}
+            <div className="quick-actions-card">
+              <div className="section-header">
+                <FiArrowRight size={24} />
+                <h3>Ações Rápidas</h3>
+              </div>
+              <div className="action-buttons">
+                <button className="btn btn-warning" onClick={() => setShowTimeRecordModal(true)}>
+                  <FiClock size={18} /><span>Ajustar Ponto Manualmente</span>
+                </button>
+                <button className="btn btn-warning" onClick={() => setShowAbsenceModal(true)}>
+                  <FiCalendar size={18} /><span>Solicitar Ausência/Férias</span>
+                </button>
+                <button className="btn btn-secondary" onClick={() => setShowRequestsModal(true)}>
+                  <FiFileText size={18} />
+                  <span>Ver Minhas Solicitações</span>
+                  {pendingRequestsCount > 0 && (
+                    <span className="badge badge-danger" style={{ marginLeft: '8px' }}>{pendingRequestsCount}</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+
+          {/* Grid de Informações e Registros */}
+          <div className="reports-grid" style={{ marginTop: '25px' }}>
+            
             {/* Estatísticas Chave */}
-            <div className="info-card stats-card">
+            <div className="card">
               <div className="section-header">
                 <FiTrendingUp size={24} />
                 <h3>Estatísticas Chave</h3>
               </div>
-              <div className="stats-body">
-                <div className="stat-item">
-                  <FiBriefcase size={20} />
-                  <span>Departamento: <strong>{employeeData.department}</strong></span>
+              <div className="config-body">
+                <div className="employee-info">
+                  <FiBriefcase size={20} /> <span>Departamento: <strong>{employeeData.department}</strong></span>
                 </div>
-                <div className="stat-item">
-                  <FiCalendar size={20} />
-                  <span>Contratação: <strong>{new Date(employeeData.hire_date).toLocaleDateString('pt-BR')}</strong></span>
+                <div className="employee-info">
+                  <FiCalendar size={20} /> <span>Contratação: <strong>{new Date(employeeData.hire_date).toLocaleDateString('pt-BR')}</strong></span>
                 </div>
-                <div className="stat-item">
-                  <FiClock size={20} />
-                  <span>Banco de Horas: <strong>{employeeData.current_time_bank !== undefined ? (employeeData.current_time_bank >= 0 ? '+' : '-') + Math.floor(Math.abs(employeeData.current_time_bank) / 60) + 'h ' + (Math.abs(employeeData.current_time_bank) % 60) + 'm' : 'N/A'}</strong></span>
+                <div className="employee-info" style={{ borderLeft: employeeData.current_time_bank > 0 ? '4px solid #28a745' : '4px solid #dc3545', paddingLeft: '10px', background: '#f8f9fa', borderRadius: '4px' }}>
+                  <FiClock size={20} /> <span>Banco de Horas: <strong>{employeeData.current_time_bank !== undefined ? (employeeData.current_time_bank >= 0 ? '+' : '-') + Math.floor(Math.abs(employeeData.current_time_bank) / 60) + 'h ' + (Math.abs(employeeData.current_time_bank) % 60) + 'm' : 'N/A'}</strong></span>
                 </div>
               </div>
             </div>
 
             {/* Registros de Hoje */}
-            <div className="info-card">
+            <div className="card">
               <div className="section-header">
                 <FiFileText size={24} />
                 <h3>Registros de Hoje</h3>
               </div>
-              <div className="records-list">
+              <div className="config-body">
                 {todayRecordsList.length > 0 ? (
                   todayRecordsList.map((record, index) => (
-                    <div key={index} className="record-item">
+                    <div key={index} className="employee-info-summary" style={{ borderLeftColor: record.type === 'exit' ? '#dc3545' : record.type === 'pause' ? '#ffc107' : '#007bff' }}>
                       {getRecordBadge(record.type)}
-                      <span className="text-muted">{formatTime(record.timestamp)}</span>
+                      <span>**{formatTime(record.timestamp)}**
+                        {record.reason && <span className="text-muted" style={{ marginLeft: '10px' }}>({record.reason})</span>}
+                      </span>
                     </div>
                   ))
                 ) : (
-                  <p className="text-muted">Nenhum registro encontrado para hoje.</p>
+                  <div className="empty-content" style={{ padding: '0' }}>
+                    <FiInfo size={30} style={{ color: '#dee2e6' }} />
+                    <p>Nenhum registro encontrado para hoje.</p>
+                  </div>
                 )}
               </div>
             </div>
-            
-            {/* Solicitações */}
-            <div className="info-card requests-card">
-              <div className="section-header">
-                <FiEdit2 size={24} />
-                <h3>Minhas Solicitações ({pendingRequestsCount})</h3>
-              </div>
-              <div className="quick-actions requests-buttons">
-                <button className="btn btn-secondary" onClick={() => setShowAbsenceModal(true)}>
-                  <FiCalendar size={16} /> Justificar Ausência
-                </button>
-                <button className="btn btn-secondary" onClick={() => setShowTimeRecordModal(true)}>
-                  <FiWatch size={16} /> Solicitar Ajuste de Ponto
-                </button>
-                <button className="btn btn-secondary" onClick={() => setShowRequestsModal(true)}>
+
+            {/* Minhas Solicitações (Card) */}
+            <div className="card" style={{ gridColumn: '1 / -1' }}>
+              <div className="table-header">
+                <h3>Minhas Solicitações</h3>
+                <button className="btn btn-secondary btn-small" onClick={() => setShowRequestsModal(true)}>
                   <FiEye size={16} /> Ver Todas
+                  {pendingRequestsCount > 0 && <span className="badge badge-danger" style={{ marginLeft: '8px' }}>{pendingRequestsCount}</span>}
                 </button>
               </div>
-              <div className="requests-summary">
-                <p>Pendentes: <span className="text-warning">{pendingRequestsCount}</span></p>
-              </div>
-            </div>
-
-          </div>
-          
-          {/* Seção de Informações Adicionais */}
-          <div className="info-card">
-            <div className="section-header">
-              <FiInfo size={24} />
-              <h3>Guia Rápido de Uso</h3>
-            </div>
-            <div className="guide-grid">
-              <div className="info-section">
-                <h4>Fluxo de Ponto</h4>
-                <ul>
-                  <li>Entrada ao começar o dia</li>
-                  <li>Pausa para almoço/café</li>
-                  <li>Retorno após pausas</li>
-                  <li>Saída ao finalizar</li>
-                  <li>Novo turno se necessário (nova Entrada)</li>
-                </ul>
-              </div>
-
-              <div className="info-section">
-                <h4>Solicitações</h4>
-                <ul>
-                  <li>Justificar ausência</li>
-                  <li>Solicitar ponto esquecido</li>
-                  <li>Acompanhar status</li>
-                </ul>
-              </div>
-
-              <div className="info-section">
-                <h4>Pausas</h4>
-                <ul>
-                  <li>Todas exigem justificativa</li>
-                  <li>Após pausar, usar **"Retornar do Almoço/Pausa"**</li>
-                </ul>
+              <div className="table-container" style={{ boxShadow: 'none', margin: '0' }}>
+                {myRequests.length > 0 ? (
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Tipo / Status</th>
+                        <th>Detalhes</th>
+                        <th>Data da Solicitação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {myRequests.slice(0, 5).map((request, index) => (
+                        <tr key={index}>
+                          <td>{renderRequestBadges(request.type, request.status)}</td>
+                          <td>
+                            {request.type === 'absence' ? `Data: ${new Date(request.date).toLocaleDateString('pt-BR')}` : `Ponto: ${new Date(request.date).toLocaleDateString('pt-BR')} ${request.time}`}
+                            <br/>
+                            <span className="text-muted">Motivo: {request.reason}</span>
+                          </td>
+                          <td>{new Date(request.createdAt).toLocaleDateString('pt-BR')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="empty-content" style={{ padding: '40px 20px 0' }}>
+                    <FiFileText size={30} style={{ color: '#dee2e6' }} />
+                    <p>Você não possui solicitações recentes.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-          
-          {/* Modais */}
+
+          {/* MODAIS */}
           
           {/* Modal de Pausa */}
           {showPauseModal && (
-            <div className="modal">
+            <div className="modal-overlay">
               <div className="modal-content">
                 <div className="modal-header">
-                  <h4><FiPauseCircle size={20} /> Registrar Pausa</h4>
-                  <button className="close-button" onClick={() => setShowPauseModal(false)}><FiX size={24} /></button>
+                  <h3><FiPauseCircle size={20} /> Registrar Pausa</h3>
+                  <button type="button" className="btn-close-modal" onClick={() => setShowPauseModal(false)}><FiX size={24} /></button>
                 </div>
                 <div className="modal-body">
                   <div className="form-group">
                     <label>Motivo da Pausa *</label>
                     <select
                       value={pauseForm.reason}
-                      onChange={(e) => setPauseForm({ ...pauseForm, reason: e.target.value })}
+                      onChange={(e) => setPauseForm({ ...pauseForm, reason: e.target.value, description: e.target.value === 'outro' ? pauseForm.description : '' })}
                       required
                     >
                       <option value="">Selecione um motivo</option>
@@ -564,7 +606,6 @@ const EmployeeDashboard = () => {
                       <option value="outro">Outro (especifique abaixo)</option>
                     </select>
                   </div>
-
                   {(pauseForm.reason === 'outro') && (
                     <div className="form-group">
                       <label>Descrição *</label>
@@ -573,18 +614,18 @@ const EmployeeDashboard = () => {
                         value={pauseForm.description} 
                         onChange={(e) => setPauseForm({ ...pauseForm, description: e.target.value })} 
                         required 
+                        placeholder="Descreva o motivo da pausa"
                       />
                     </div>
                   )}
-
-                  <div className="modal-footer">
+                  <div className="modal-footer" style={{ borderTop: 'none', background: 'white', padding: '0' }}>
                     <button className="btn btn-secondary" onClick={() => setShowPauseModal(false)}>Cancelar</button>
                     <button 
                       className="btn btn-primary" 
                       disabled={!pauseForm.reason || (pauseForm.reason === 'outro' && !pauseForm.description) || registerLoading} 
                       onClick={handlePauseSubmit}
                     >
-                      {registerLoading ? 'Registrando...' : 'Confirmar Pausa'}
+                      <FiSave size={16} /> {registerLoading ? 'Registrando...' : 'Confirmar Pausa'}
                     </button>
                   </div>
                 </div>
@@ -594,49 +635,46 @@ const EmployeeDashboard = () => {
 
           {/* Modal de Solicitações (Ver Todas) */}
           {showRequestsModal && (
-            <div className="modal">
-              <div className="modal-content large-modal">
+            <div className="modal-overlay">
+              <div className="modal-content large">
                 <div className="modal-header">
-                  <h4><FiEye size={20} /> Minhas Solicitações</h4>
-                  <button className="close-button" onClick={() => setShowRequestsModal(false)}><FiX size={24} /></button>
+                  <h3><FiEye size={20} /> Minhas Solicitações</h3>
+                  <button type="button" className="btn-close-modal" onClick={() => setShowRequestsModal(false)}><FiX size={24} /></button>
                 </div>
                 <div className="modal-body">
                   {myRequests.length === 0 ? (
-                    <p className="text-muted">Você não possui solicitações registradas.</p>
+                    <div className="empty-content">
+                      <FiFileText size={40} style={{ color: '#dee2e6' }} />
+                      <p className="text-muted" style={{ fontStyle: 'normal' }}>Você não possui solicitações registradas.</p>
+                    </div>
                   ) : (
-                    <table className="requests-table">
-                      <thead>
-                        <tr>
-                          <th>Tipo / Status</th>
-                          <th>Detalhes</th>
-                          <th>Data da Solicitação</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {myRequests.map((request) => (
-                          <tr key={request._id} className={getStatusClass(request.status)}>
-                            <td>{getTypeBadge(request.type, request.status)}</td>
-                            <td>
-                              {request.type === 'absence' ? (
-                                <>
-                                  <p><strong>Ausência:</strong> {new Date(request.date).toLocaleDateString('pt-BR')}</p>
-                                  <p><strong>Motivo:</strong> {request.reason}</p>
-                                  <p className="text-muted">Desc: {request.description || 'N/A'}</p>
-                                </>
-                              ) : (
-                                <>
-                                  <p><strong>Ajuste:</strong> {new Date(request.date).toLocaleDateString('pt-BR')} às {request.time}</p>
-                                  <p><strong>Motivo:</strong> {request.reason}</p>
-                                  <p className="text-muted">Desc: {request.description || 'N/A'}</p>
-                                </>
-                              )}
-                              {request.admin_note && <p className="admin-note">**Admin Note:** {request.admin_note}</p>}
-                            </td>
-                            <td>{new Date(request.created_at).toLocaleDateString('pt-BR')}</td>
+                    <div className="table-container" style={{ boxShadow: 'none', margin: '0' }}>
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Tipo / Status</th>
+                            <th>Detalhes</th>
+                            <th>Data da Solicitação</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {myRequests.map((request, index) => (
+                            <tr key={index}>
+                              <td>{renderRequestBadges(request.type, request.status)}</td>
+                              <td>
+                                {request.type === 'absence' 
+                                  ? `Data: ${new Date(request.date).toLocaleDateString('pt-BR')}` 
+                                  : `Ponto: ${new Date(request.date).toLocaleDateString('pt-BR')} ${request.time}`}
+                                <br/>
+                                <span className="text-muted">Motivo: {request.reason}</span>
+                                {request.description && <p className="text-muted" style={{ margin: '5px 0 0 0' }}>* {request.description}</p>}
+                              </td>
+                              <td>{new Date(request.createdAt).toLocaleDateString('pt-BR')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </div>
                 <div className="modal-footer">
@@ -645,34 +683,50 @@ const EmployeeDashboard = () => {
               </div>
             </div>
           )}
-          
-          {/* Modal de Justificar Ausência */}
+
+          {/* Modal de Solicitação de Ausência */}
           {showAbsenceModal && (
-            <div className="modal">
+            <div className="modal-overlay">
               <div className="modal-content">
                 <div className="modal-header">
-                  <h4><FiCalendar size={20} /> Justificar Ausência</h4>
-                  <button className="close-button" onClick={() => setShowAbsenceModal(false)}><FiX size={24} /></button>
+                  <h3><FiCalendar size={20} /> Solicitar Ausência</h3>
+                  <button type="button" className="btn-close-modal" onClick={() => setShowAbsenceModal(false)}><FiX size={24} /></button>
                 </div>
                 <form onSubmit={handleAbsenceSubmit}>
                   <div className="modal-body">
+                    <p className="text-muted" style={{ marginBottom: '20px' }}>Use este formulário para solicitar dias de ausência ou férias.</p>
                     <div className="form-group">
-                      <label>Data da Ausência *</label>
-                      <input type="date" value={absenceForm.date} onChange={(e) => setAbsenceForm({...absenceForm, date: e.target.value})} required />
+                      <label>Data de Ausência *</label>
+                      <input 
+                        type="date" 
+                        value={absenceForm.date} 
+                        onChange={(e) => setAbsenceForm({...absenceForm, date: e.target.value})} 
+                        required 
+                      />
                     </div>
                     <div className="form-group">
                       <label>Motivo *</label>
-                      <select value={absenceForm.reason} onChange={(e) => setAbsenceForm({...absenceForm, reason: e.target.value})} required>
-                        <option value="">Selecione o Motivo</option>
-                        <option value="Atestado Médico">Atestado Médico</option>
-                        <option value="Férias">Férias</option>
-                        <option value="Folga Compensatória">Folga Compensatória</option>
-                        <option value="Outro">Outro (especifique)</option>
+                      <select 
+                        value={absenceForm.reason} 
+                        onChange={(e) => setAbsenceForm({...absenceForm, reason: e.target.value})} 
+                        required
+                      >
+                        <option value="">Selecione o motivo</option>
+                        <option value="ferias">Férias</option>
+                        <option value="licenca-medica">Licença Médica</option>
+                        <option value="assuntos-pessoais">Assuntos Pessoais</option>
+                        <option value="outro">Outro</option>
                       </select>
                     </div>
                     <div className="form-group">
                       <label>Detalhes/Descrição</label>
-                      <textarea value={absenceForm.description} onChange={(e) => setAbsenceForm({...absenceForm, description: e.target.value})} rows="3"></textarea>
+                      <textarea 
+                        value={absenceForm.description} 
+                        onChange={(e) => setAbsenceForm({...absenceForm, description: e.target.value})} 
+                        rows="3"
+                        className="form-group input"
+                        style={{ height: 'auto', minHeight: '100px' }}
+                      ></textarea>
                     </div>
                   </div>
                   <div className="modal-footer">
@@ -686,37 +740,58 @@ const EmployeeDashboard = () => {
             </div>
           )}
 
-          {/* Modal de Solicitar Ponto Esquecido */}
+          {/* Modal de Ajuste de Ponto Manual */}
           {showTimeRecordModal && (
-            <div className="modal">
+            <div className="modal-overlay">
               <div className="modal-content">
                 <div className="modal-header">
-                  <h4><FiWatch size={20} /> Solicitar Ajuste de Ponto</h4>
-                  <button className="close-button" onClick={() => setShowTimeRecordModal(false)}><FiX size={24} /></button>
+                  <h3><FiClock size={20} /> Ajuste de Ponto</h3>
+                  <button type="button" className="btn-close-modal" onClick={() => setShowTimeRecordModal(false)}><FiX size={24} /></button>
                 </div>
                 <form onSubmit={handleTimeRecordSubmit}>
                   <div className="modal-body">
-                    <p className="text-muted">Use este formulário para solicitar o registro de um ponto que você esqueceu de bater.</p>
+                    <p className="text-muted" style={{ marginBottom: '20px' }}>Preencha o formulário para solicitar o registro de um ponto que você esqueceu de bater.</p>
                     <div className="form-group">
                       <label>Data do Ponto *</label>
-                      <input type="date" value={timeRecordForm.date} onChange={(e) => setTimeRecordForm({...timeRecordForm, date: e.target.value})} required />
+                      <input 
+                        type="date" 
+                        value={timeRecordForm.date} 
+                        onChange={(e) => setTimeRecordForm({...timeRecordForm, date: e.target.value})} 
+                        required 
+                      />
                     </div>
                     <div className="form-group">
                       <label>Hora do Ponto *</label>
-                      <input type="time" value={timeRecordForm.time} onChange={(e) => setTimeRecordForm({...timeRecordForm, time: e.target.value})} required />
+                      <input 
+                        type="time" 
+                        value={timeRecordForm.time} 
+                        onChange={(e) => setTimeRecordForm({...timeRecordForm, time: e.target.value})} 
+                        required 
+                      />
                     </div>
                     <div className="form-group">
-                      <label>Motivo do Esquecimento *</label>
-                      <select value={timeRecordForm.reason} onChange={(e) => setTimeRecordForm({...timeRecordForm, reason: e.target.value})} required>
-                        <option value="">Selecione o Motivo</option>
-                        <option value="Esquecimento">Esquecimento</option>
-                        <option value="Problema Técnico">Problema Técnico</option>
-                        <option value="Outro">Outro (especifique)</option>
+                      <label>Motivo *</label>
+                      <select 
+                        value={timeRecordForm.reason} 
+                        onChange={(e) => setTimeRecordForm({...timeRecordForm, reason: e.target.value})} 
+                        required
+                      >
+                        <option value="">Selecione o motivo</option>
+                        <option value="esquecimento">Esquecimento</option>
+                        <option value="falha-equipamento">Falha de Equipamento</option>
+                        <option value="trabalho-externo">Trabalho Externo</option>
+                        <option value="outro">Outro</option>
                       </select>
                     </div>
                     <div className="form-group">
                       <label>Detalhes/Descrição</label>
-                      <textarea value={timeRecordForm.description} onChange={(e) => setTimeRecordForm({...timeRecordForm, description: e.target.value})} rows="3"></textarea>
+                      <textarea 
+                        value={timeRecordForm.description} 
+                        onChange={(e) => setTimeRecordForm({...timeRecordForm, description: e.target.value})} 
+                        rows="3"
+                        className="form-group input"
+                        style={{ height: 'auto', minHeight: '100px' }}
+                      ></textarea>
                     </div>
                   </div>
                   <div className="modal-footer">
@@ -729,7 +804,42 @@ const EmployeeDashboard = () => {
               </div>
             </div>
           )}
-          
+
+          {/* Modal de Sucesso */}
+          {showSuccessModal && (
+            <div className="modal-overlay success-modal">
+              <div className="modal-content">
+                <div className="success-content">
+                  <FiCheckCircle size={60} className="success-icon" />
+                  <h3>{modalContent.title}</h3>
+                  <p>{modalContent.message}</p>
+                </div>
+                <div className="modal-footer" style={{ borderTop: 'none', background: 'white' }}>
+                  <button className="btn btn-success" onClick={closeAllModals}>
+                    <FiCheck size={16} /> Fechar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal de Erro */}
+          {showErrorModal && (
+            <div className="modal-overlay error-modal">
+              <div className="modal-content">
+                <div className="error-content">
+                  <FiAlertCircle size={60} className="error-icon" />
+                  <h3>{modalContent.title}</h3>
+                  <p>{modalContent.message}</p>
+                </div>
+                <div className="modal-footer" style={{ borderTop: 'none', background: 'white' }}>
+                  <button className="btn btn-danger" onClick={closeAllModals}>
+                    <FiX size={16} /> Fechar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <div className="info-card error-card">

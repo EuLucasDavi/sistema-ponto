@@ -2866,3 +2866,17 @@ body {
 .status-indicator.exit {
   border-left-color: #dc3545;
 }
+
+.quick-actions-card {
+  background: white;
+  padding: 25px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid #e9ecef;
+  transition: transform 0.3s ease;
+  width: 100%;
+}
+
+.quick-actions-card:hover {
+  transform: translateY(-2px);
+}
