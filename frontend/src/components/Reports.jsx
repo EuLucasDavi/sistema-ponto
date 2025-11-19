@@ -8,12 +8,11 @@ import {
   FiDollarSign,
   FiCheckCircle,
   FiAlertCircle,
-  FiClock,
   FiBarChart2,
   FiSettings,
   FiUser,
   FiInfo,
-  FiZap // Novo ícone para o botão de reset
+  FiZap // Ícone para zerar saldo
 } from 'react-icons/fi';
 
 const Reports = () => {
@@ -21,9 +20,8 @@ const Reports = () => {
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [year, setYear] = useState(new Date().getFullYear());
-  // Adicionado loading para o reset
+  
+  // Estados de loading para cada ação
   const [loading, setLoading] = useState({ pdf: false, excel: false, reset: false }); 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -31,7 +29,7 @@ const Reports = () => {
   useEffect(() => {
     fetchEmployees();
     
-    // Definir datas padrão (início e fim do mês atual)
+    // Define datas padrão (início e fim do mês atual)
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
     const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -50,16 +48,6 @@ const Reports = () => {
     }
   };
 
-  const handleMonthYearChange = (newMonth, newYear) => {
-    const firstDay = new Date(newYear, newMonth - 1, 1);
-    const lastDay = new Date(newYear, newMonth, 0);
-
-    setMonth(newMonth);
-    setYear(newYear);
-    setStartDate(firstDay.toISOString().split('T')[0]);
-    setEndDate(lastDay.toISOString().split('T')[0]);
-  };
-
   const minutesToTimeDisplay = (totalMinutes) => {
     if (totalMinutes === undefined || totalMinutes === null) return '0h 0m';
     const sign = totalMinutes < 0 ? '-' : '';
@@ -76,7 +64,7 @@ const Reports = () => {
       return;
     }
     const employee = employees.find(e => e._id === selectedEmployee);
-    if (!confirm(`Tem certeza que deseja zerar o saldo de horas de ${employee?.name || 'este funcionário'}? Esta ação é irreversível.`)) {
+    if (!window.confirm(`Tem certeza que deseja zerar o saldo de horas de ${employee?.name || 'este funcionário'}? Esta ação é irreversível.`)) {
       return;
     }
 
