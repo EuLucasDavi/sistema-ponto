@@ -12,7 +12,8 @@ import {
   FiBriefcase,
   FiUser,
   FiAlertCircle,
-  FiDollarSign // 💡 Importação adicional necessária
+  FiDollarSign,
+  FiClock
 } from 'react-icons/fi';
 
 const EmployeeManagement = () => {
