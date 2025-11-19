@@ -215,6 +215,49 @@ const calculateDailySummary = (records) => {
 
     return { totalWorkMinutes, totalPauseMinutes, pauses, dailyClock };
 };
+// --- ENDPOINTS DE CHECAGEM ---
+app.get('/health', async (req, res) => {
+  try {
+    let dbStatus = 'Disconnected';
+    let dbError = null;
+
+    if (db) {
+      try {
+        await db.command({ ping: 1 });
+        dbStatus = 'Connected';
+      } catch (error) {
+        dbStatus = 'Error';
+        dbError = error.message;
+      }
+    }
+
+    res.json({
+      status: 'OK',
+      service: 'Sistema Ponto Backend',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      database: dbStatus,
+      databaseError: dbError,
+      version: '1.0.0'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'Error',
+      error: error.message
+    });
+  }
+});
+
+app.get('/', (req, res) => {
+  res.redirect('/health');
+});
+
+app.get('/api/test', (req, res) => {
+  res.json({
+    message: 'API está funcionando!',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // --- ENDPOINTS DE AUTENTICAÇÃO E USUÁRIOS ---
 app.post('/api/login', async (req, res) => {
