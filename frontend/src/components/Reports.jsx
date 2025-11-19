@@ -284,8 +284,8 @@ const Reports = () => {
 
       <div className="reports-section">
         <div className="section-header">
-          <FiBarChart2 size={24} />
-          <h3>Sobre os Relatórios</h3>
+          <FiBarChart2 className="header-icon"size={24} />
+          <h1>Sobre os Relatórios</h1>
         </div>
         <div className="report-info-grid">
           <div className="info-card">

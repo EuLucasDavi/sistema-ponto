@@ -133,34 +133,31 @@ const requireEmployee = (req, res, next) => {
 
 // --- FUNÇÕES AUXILIARES DE TEMPO (NOVAS E ESSENCIAIS) ---
 
-/**
- * Converte um total de minutos em formato de hora HH:MM.
- * @param {number} totalMinutes - Total de minutos (pode ser negativo)
- * @returns {string} - Tempo formatado (ex: "08:30" ou "-02:15")
- */
+
 const minutesToTime = (totalMinutes) => {
+  if (isNaN(totalMinutes) || totalMinutes === null || totalMinutes === undefined) return '00:00';
+  
   const sign = totalMinutes < 0 ? '-' : '';
-  const minutes = Math.abs(totalMinutes);
+  const minutes = Math.abs(Math.round(totalMinutes));
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return `${sign}${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 };
 
-/**
- * Calcula o resumo de registros de ponto de um único dia.
- * @param {Array<Object>} records - Registros de ponto ordenados por dia.
- * @returns {Object} - Resumo diário (horas trabalhadas, pausas, etc.)
- */
 const calculateDailySummary = (records) => {
   let totalWorkMinutes = 0;
   let totalPauseMinutes = 0;
   let clock = {
     entry: null,
     pause: null,
-    return: null, // entry after pause
+    return: null,
     exit: null
   };
   const pauses = [];
+
+  if (!records || records.length === 0) {
+    return { totalWorkMinutes, totalPauseMinutes, pauses, dailyClock: {} };
+  }
 
   // Garante que os registros estejam ordenados por timestamp
   records.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -183,7 +180,7 @@ const calculateDailySummary = (records) => {
       clock.entry = null;
 
       pauses.push({
-        reason: record.pause_reason_id || 'Outro', // ID da razão
+        reason: record.pause_reason_id || 'Outro',
         description: record.custom_reason || '',
         start: clock.pause
       });
@@ -219,7 +216,6 @@ const calculateDailySummary = (records) => {
   const dailyClock = {
     entry: records.find(r => r.type === 'entry')?.timestamp,
     pause: records.find(r => r.type === 'pause')?.timestamp,
-    // Procura a segunda 'entry', que é o retorno (assumindo 4 batidas)
     return: records.filter(r => r.type === 'entry')[1]?.timestamp,
     exit: records.find(r => r.type === 'exit')?.timestamp,
   };
@@ -693,6 +689,11 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
       return res.status(400).json({ error: 'ID do funcionário e intervalo de datas são obrigatórios.' });
     }
 
+    // Verificar se o database está conectado
+    if (!db) {
+      return res.status(500).json({ error: 'Database não conectado' });
+    }
+
     const employee = await db.collection('employees').findOne({ _id: new ObjectId(employee_id) });
     if (!employee) {
       return res.status(404).json({ error: 'Funcionário não encontrado.' });
@@ -735,26 +736,29 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
       });
 
       dailySummaries[dateStr] = summary;
-      totalWorkMinutesPeriod += summary.totalWorkMinutes;
+      totalWorkMinutesPeriod += summary.totalWorkMinutes || 0;
     }
 
     // --- GERAÇÃO PDF ---
     const doc = new PDFDocument({ margin: 30, size: 'A4' });
+    
+    // Configurar headers ANTES de começar a escrever no PDF
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="espelho_ponto_${employee.name.replace(/\s/g, '_')}_${start_date}_${req.query.end_date}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="espelho_ponto_${employee.name.replace(/\s/g, '_')}_${start_date}_${end_date}.pdf"`);
+    
     doc.pipe(res);
 
     // Header
     doc.fontSize(16).text('Espelho de Ponto', { align: 'center' });
     doc.fontSize(10).moveDown();
     doc.text(`Funcionário: ${employee.name}`);
-    doc.text(`Período: ${new Date(start_date).toLocaleDateString('pt-BR')} a ${new Date(req.query.end_date).toLocaleDateString('pt-BR')}`);
+    doc.text(`Período: ${new Date(start_date).toLocaleDateString('pt-BR')} a ${new Date(end_date).toLocaleDateString('pt-BR')}`);
     doc.text(`Departamento: ${employee.department}`);
     doc.moveDown();
 
     // Tabela
     const columnWidths = [60, 60, 60, 60, 60, 200];
-    // Define uma função auxiliar para desenhar a linha
+    
     const drawRow = (data, isHeader = false, isSummary = false) => {
       let currentX = doc.x;
       const rowHeight = isSummary ? 20 : 15;
@@ -766,7 +770,7 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
       doc.font(isHeader ? 'Helvetica-Bold' : (isSummary ? 'Helvetica-Oblique' : 'Helvetica'));
 
       data.forEach((text, i) => {
-        doc.fontSize(8).text(text, currentX, doc.y, {
+        doc.fontSize(8).text(text.toString(), currentX, doc.y, {
           width: columnWidths[i],
           align: ['left', 'center', 'center', 'center', 'center', 'left'][i],
           height: rowHeight,
@@ -810,23 +814,19 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
         '',
         '',
         `Total Pausa: ${totalPauseTimeStr} | Motivos: ${pauseReasonsText || 'Nenhuma pausa registrada'}`
-      ], false, true); // isSummary = true
+      ], false, true);
     }
+    
     // Linha final da tabela
     doc.moveTo(doc.x, doc.y).lineTo(doc.page.width - doc.options.margin, doc.y).stroke('black');
     doc.moveDown(2);
 
     // --- RESUMO/TOTALIZAÇÃO ---
-
-    // Número de dias no período (para cálculo de horas padrão)
-    const diffInTime = new Date(req.query.end_date).getTime() - new Date(start_date).getTime();
+    const diffInTime = new Date(end_date).getTime() - new Date(start_date).getTime();
     const totalDaysPeriod = Math.ceil(diffInTime / (1000 * 3600 * 24)) + 1;
-
-    const totalWorkMinutes = totalWorkMinutesPeriod;
-    // Padrão: 8 horas líquidas por dia (480 min/dia)
     const standardHours = totalDaysPeriod * 8 * 60;
 
-    let diffMinutes = totalWorkMinutes - standardHours; // Diferença do período
+    let diffMinutes = totalWorkMinutesPeriod - standardHours;
     const totalSalary = employee.salary || 0;
     let extraValue = 0;
     let timeBankBalance = employee.current_time_bank || 0;
@@ -834,12 +834,10 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
     // Aplica a regra de Banco de Horas / Hora Extra
     if (employee.overtime_format === 'paid_overtime') {
       if (diffMinutes > 0) {
-        // Cálculo de Hora Extra Paga: Salário / 220 horas (padrão) * horas extras * 1.5 (50% adicional)
         const hourlyRate = (totalSalary / 220);
         extraValue = (diffMinutes / 60) * hourlyRate * 1.5;
       }
-    } else { // time_bank
-      // Acumula a diferença do período no saldo atual do banco.
+    } else {
       timeBankBalance += diffMinutes;
     }
 
@@ -865,7 +863,7 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
         doc.text(`VALOR DE HORA EXTRA: R$ 0.00`).moveDown(0.5);
       }
     }
-    doc.fillColor('black'); // Volta a cor para o padrão
+    doc.fillColor('black');
 
     doc.end();
 
