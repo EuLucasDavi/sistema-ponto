@@ -124,17 +124,17 @@ const EmployeeDashboard = () => {
     }
   };
 
-const getAvailableActions = () => {
-  if (todayRecordsList.length === 0) {
+  const getAvailableActions = () => {
+    if (todayRecordsList.length - 1) {
+      return ['entry'];
+    }
+
+    const last = todayRecordsList[todayRecordsList.length - 1].type;
+
+    if (last === 'entry') return ['pause', 'exit'];
+    if (last === 'pause') return ['entry'];
     return ['entry'];
-  }
-
-  const last = todayRecordsList[todayRecordsList.length - 1].type;
-
-  if (last === 'entry') return ['pause', 'exit'];
-  if (last === 'pause') return ['entry'];
-  return ['entry'];
-};
+  };
 
   const registerTime = async (type, pauseReason = null) => {
     setRegisterLoading(true);
@@ -303,8 +303,8 @@ const getAvailableActions = () => {
                     {lastRecordType === 'pause'
                       ? <span>Retornar do Almoço</span>
                       : lastRecordType === 'exit'
-                      ? <span>Novo Turno</span>
-                      : <span>Registrar Entrada</span>}
+                        ? <span>Novo Turno</span>
+                        : <span>Registrar Entrada</span>}
                   </button>
                 )}
 
@@ -368,7 +368,7 @@ const getAvailableActions = () => {
                       <strong>Tipo</strong>
                       <span className={`record-type ${lastRecord.type}`}>
                         {lastRecord.type === 'entry' ? 'Entrada' :
-                         lastRecord.type === 'pause' ? 'Pausa' : 'Saída'}
+                          lastRecord.type === 'pause' ? 'Pausa' : 'Saída'}
                       </span>
                     </div>
                     <div className="record-item">
@@ -390,12 +390,12 @@ const getAvailableActions = () => {
                       <div key={record._id} className="today-record-item">
                         <span className={`record-badge ${record.type}`}>
                           {record.type === 'entry' ? '→' :
-                           record.type === 'pause' ? '⏸' : '←'}
+                            record.type === 'pause' ? '⏸' : '←'}
                         </span>
                         <span>{new Date(record.timestamp).toLocaleTimeString('pt-BR')}</span>
                         <span className={`record-type-small ${record.type}`}>
                           {record.type === 'entry' ? 'Entrada' :
-                           record.type === 'pause' ? 'Pausa' : 'Saída'}
+                            record.type === 'pause' ? 'Pausa' : 'Saída'}
                         </span>
                       </div>
                     ))}
@@ -708,7 +708,7 @@ const getAvailableActions = () => {
                         </div>
                         <span className={`record-type ${record.type}`}>
                           {record.type === 'entry' ? 'ENTRADA' :
-                           record.type === 'pause' ? 'PAUSA' : 'SAÍDA'}
+                            record.type === 'pause' ? 'PAUSA' : 'SAÍDA'}
                         </span>
                       </div>
                     </div>
