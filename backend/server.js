@@ -133,6 +133,25 @@ const requireEmployee = (req, res, next) => {
 
 // --- FUNÇÕES AUXILIARES DE TEMPO (NOVAS E ESSENCIAIS) ---
 
+// Função auxiliar para converter datas considerando o timezone
+const adjustDateForTimezone = (date) => {
+  const adjusted = new Date(date);
+  // Ajusta para o timezone do Brasil (UTC-3)
+  adjusted.setHours(adjusted.getHours() + 3);
+  return adjusted;
+};
+
+const getStartOfDay = (date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const getEndOfDay = (date) => {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+};
 
 const minutesToTime = (totalMinutes) => {
   if (isNaN(totalMinutes) || totalMinutes === null || totalMinutes === undefined) return '00:00';
@@ -689,7 +708,6 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
       return res.status(400).json({ error: 'ID do funcionário e intervalo de datas são obrigatórios.' });
     }
 
-    // Verificar se o database está conectado
     if (!db) {
       return res.status(500).json({ error: 'Database não conectado' });
     }
@@ -699,26 +717,41 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
       return res.status(404).json({ error: 'Funcionário não encontrado.' });
     }
 
-    const startDate = new Date(start_date);
-    const endDate = new Date(end_date);
-    endDate.setDate(endDate.getDate() + 1); // Garante que a data final seja inclusiva
+    // CORREÇÃO: Ajustar as datas para considerar o timezone
+    const startDate = getStartOfDay(start_date);
+    const endDate = getEndOfDay(end_date);
+
+    console.log('📅 Buscando registros:', {
+      employee_id,
+      start_date,
+      end_date,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString()
+    });
 
     const records = await db.collection('time_records').find({
       employee_id: new ObjectId(employee_id),
-      timestamp: { $gte: startDate, $lt: endDate }
+      timestamp: { 
+        $gte: startDate,
+        $lte: endDate
+      }
     }).sort({ timestamp: 1 }).toArray();
+
+    console.log(`📊 Encontrados ${records.length} registros`);
 
     const pauseReasonsMap = await db.collection('pause_reasons').find().toArray();
     const getPauseReasonName = (id) => {
       if (!id) return 'Outro';
-      // Converte o ID para string para comparação
       const reason = pauseReasonsMap.find(r => r._id.toString() === id.toString());
       return reason ? reason.name : 'Motivo Desconhecido';
     };
 
-    // Agrupa registros por dia
+    // Agrupa registros por dia (considerando timezone local)
     const dailyRecords = records.reduce((acc, record) => {
-      const dateStr = new Date(record.timestamp).toISOString().split('T')[0];
+      // Usa o timestamp ajustado para o timezone local
+      const date = new Date(record.timestamp);
+      const dateStr = date.toLocaleDateString('pt-BR'); // Formato DD/MM/YYYY
+      
       if (!acc[dateStr]) acc[dateStr] = [];
       acc[dateStr].push(record);
       return acc;
@@ -730,7 +763,6 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
     for (const dateStr in dailyRecords) {
       const summary = calculateDailySummary(dailyRecords[dateStr]);
 
-      // Substituir IDs dos motivos por nomes
       summary.pauses.forEach(p => {
         p.reason = getPauseReasonName(p.reason);
       });
@@ -739,10 +771,9 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
       totalWorkMinutesPeriod += summary.totalWorkMinutes || 0;
     }
 
-    // --- GERAÇÃO PDF ---
+    // Restante do código do PDF permanece igual...
     const doc = new PDFDocument({ margin: 30, size: 'A4' });
     
-    // Configurar headers ANTES de começar a escrever no PDF
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="espelho_ponto_${employee.name.replace(/\s/g, '_')}_${start_date}_${end_date}.pdf"`);
     
@@ -763,7 +794,6 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
       let currentX = doc.x;
       const rowHeight = isSummary ? 20 : 15;
 
-      // Desenha linha divisória antes da linha de dados
       doc.moveTo(doc.x, doc.y).lineTo(doc.page.width - doc.options.margin, doc.y).stroke('black');
       doc.y += 2;
 
@@ -790,17 +820,17 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
     for (const dateStr in dailySummaries) {
       const summary = dailySummaries[dateStr];
       const records = summary.dailyClock;
-      const date = new Date(dateStr).toLocaleDateString('pt-BR');
-      const totalPauseTimeStr = minutesToTime(summary.totalPauseMinutes);
-      const totalWorkTimeStr = minutesToTime(summary.totalWorkMinutes);
-
+      
       const entryTime = records.entry ? new Date(records.entry).toLocaleTimeString('pt-BR').substring(0, 5) : 'FALTA';
       const pauseTime = records.pause ? new Date(records.pause).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
       const returnTime = records.return ? new Date(records.return).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
       const exitTime = records.exit ? new Date(records.exit).toLocaleTimeString('pt-BR').substring(0, 5) : '-';
 
+      const totalPauseTimeStr = minutesToTime(summary.totalPauseMinutes);
+      const totalWorkTimeStr = minutesToTime(summary.totalWorkMinutes);
+
       // 1ª Linha: Pontos de Bate
-      drawRow([date, entryTime, pauseTime, returnTime, exitTime]);
+      drawRow([dateStr, entryTime, pauseTime, returnTime, exitTime]);
 
       // 2ª Linha: Total Pausa e Motivos
       const pauseReasonsText = summary.pauses.map(p => {
@@ -817,11 +847,10 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
       ], false, true);
     }
     
-    // Linha final da tabela
     doc.moveTo(doc.x, doc.y).lineTo(doc.page.width - doc.options.margin, doc.y).stroke('black');
     doc.moveDown(2);
 
-    // --- RESUMO/TOTALIZAÇÃO ---
+    // Restante do código do resumo...
     const diffInTime = new Date(end_date).getTime() - new Date(start_date).getTime();
     const totalDaysPeriod = Math.ceil(diffInTime / (1000 * 3600 * 24)) + 1;
     const standardHours = totalDaysPeriod * 8 * 60;
@@ -831,7 +860,6 @@ app.get('/api/reports/pdf', authenticateToken, requireAdmin, async (req, res) =>
     let extraValue = 0;
     let timeBankBalance = employee.current_time_bank || 0;
 
-    // Aplica a regra de Banco de Horas / Hora Extra
     if (employee.overtime_format === 'paid_overtime') {
       if (diffMinutes > 0) {
         const hourlyRate = (totalSalary / 220);
@@ -1063,8 +1091,8 @@ app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, 
 
     if (start_date && end_date) {
       query.timestamp = {
-        $gte: new Date(start_date),
-        $lte: new Date(end_date + 'T23:59:59.999Z')
+        $gte: getStartOfDay(start_date),
+        $lte: getEndOfDay(end_date)
       };
     }
 
