@@ -306,28 +306,28 @@ const EmployeeDashboard = () => {
     switch (action) {
       case 'entry':
         return (
-          <button key="entry" className="btn btn-primary btn-large" onClick={() => handleRegisterRecord('entry')} disabled={registerLoading}>
+          <button key="entry" className="btn btn-primary btn-large" onClick={() => setLastRecord('entry')} disabled={registerLoading}>
             <FiLogIn size={20} />
             {registerLoading ? 'Registrando...' : 'Registrar Entrada'}
           </button>
         );
       case 'exit':
         return (
-          <button key="exit" className="btn btn-danger btn-large" onClick={() => handleRegisterRecord('exit')} disabled={registerLoading}>
+          <button key="exit" className="btn btn-danger btn-large" onClick={() => setLastRecord('exit')} disabled={registerLoading}>
             <FiLogOut size={20} />
             {registerLoading ? 'Registrando...' : 'Registrar Saída'}
           </button>
         );
       case 'pause':
         return (
-          <button key="pause" className="btn btn-warning btn-large" onClick={() => handleRegisterRecord('pause')} disabled={registerLoading}>
+          <button key="pause" className="btn btn-warning btn-large" onClick={() => setLastRecord('pause')} disabled={registerLoading}>
             <FiPauseCircle size={20} />
             {registerLoading ? 'Registrando...' : 'Registrar Pausa'}
           </button>
         );
       case 'return':
         return (
-          <button key="return" className="btn btn-success btn-large" onClick={() => handleRegisterRecord('return')} disabled={registerLoading}>
+          <button key="return" className="btn btn-success btn-large" onClick={() => setLastRecord('return')} disabled={registerLoading}>
             <FiCheckCircle size={20} />
             {registerLoading ? 'Registrando...' : 'Registrar Retorno'}
           </button>
