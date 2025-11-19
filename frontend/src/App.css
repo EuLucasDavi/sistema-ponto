@@ -19,6 +19,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.modal-open {
+  overflow: hidden !important; 
+}
+
 * {
   -webkit-tap-highlight-color: transparent;
 }
@@ -364,7 +368,8 @@ body {
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
   width: 100%;
   padding: 12px 15px;
   border: 2px solid #e9ecef;
@@ -376,7 +381,8 @@ body {
 }
 
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   outline: none;
   border-color: #007bff;
   box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
@@ -1222,6 +1228,11 @@ body {
   color: #721c24;
 }
 
+.record-type.pause { /* NOVO ESTILO */
+  background: #fff3cd; /* Cor para Pausa (Warning) */
+  color: #856404;
+}
+
 .admin-badge {
   display: flex;
   align-items: center;
@@ -1344,6 +1355,11 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.employee-info strong {
+  color: #2c3e50;
+  font-weight: 600;
 }
 
 .employee-id {
@@ -2393,6 +2409,7 @@ body {
   flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   animation: modalSlideIn 0.3s ease-out;
+  position: relative;
 }
 
 @keyframes modalSlideIn {

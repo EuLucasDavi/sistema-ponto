@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   FiUser, FiClock, FiCalendar, FiBriefcase, FiLogIn, FiLogOut,
   FiCheckCircle, FiAlertCircle, FiInfo, FiArrowRight, FiHome,
-  FiTrendingUp, FiPauseCircle, FiWatch, FiX, FiFileText, FiSave, FiEye
+  FiTrendingUp, FiPauseCircle, FiWatch, FiX, FiFileText, FiSave, FiEye, FiCheck
 } from 'react-icons/fi';
 
 // Funções de formatação (adicionadas/completadas para o componente funcionar)
@@ -50,6 +50,23 @@ const EmployeeDashboard = () => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // NOVO: Efeito para controlar o scroll do body (aplicando a classe .modal-open)
+  useEffect(() => {
+    const isModalOpen = showAbsenceModal || showTimeRecordModal || showRequestsModal || showPauseModal || showSuccessModal || showErrorModal;
+    
+    if (isModalOpen) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+
+    // Função de limpeza
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [showAbsenceModal, showTimeRecordModal, showRequestsModal, showPauseModal, showSuccessModal, showErrorModal]);
+  // FIM NOVO EFEITO
 
   const resetState = () => {
     setEmployeeData(null);
@@ -724,7 +741,6 @@ const EmployeeDashboard = () => {
                         value={absenceForm.description} 
                         onChange={(e) => setAbsenceForm({...absenceForm, description: e.target.value})} 
                         rows="3"
-                        className="form-group input"
                         style={{ height: 'auto', minHeight: '100px' }}
                       ></textarea>
                     </div>
@@ -789,7 +805,6 @@ const EmployeeDashboard = () => {
                         value={timeRecordForm.description} 
                         onChange={(e) => setTimeRecordForm({...timeRecordForm, description: e.target.value})} 
                         rows="3"
-                        className="form-group input"
                         style={{ height: 'auto', minHeight: '100px' }}
                       ></textarea>
                     </div>
