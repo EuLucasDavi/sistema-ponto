@@ -274,7 +274,6 @@ const Reports = () => {
             onClick={handleResetBank}
             disabled={loading.reset || !selectedEmployee}
             title="Zerar Saldo de Banco de Horas/Hora Extra do Funcionário"
-            style={{ marginLeft: 'auto' }}
           >
             <FiZap size={16} />
             {loading.reset ? 'Zerando...' : 'Zerar Saldo de Horas'}

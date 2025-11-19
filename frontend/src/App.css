@@ -318,8 +318,10 @@ body {
 }
 
 .report-buttons .btn {
+  flex: 1;
   min-width: 200px;
   justify-content: center;
+  white-space: nowrap;
 }
 
 .report-buttons .btn-danger {
@@ -2365,13 +2367,6 @@ body {
   margin: 0;
 }
 
-.form-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  margin-top: 20px;
-}
-
 /* Modal Styles */
 .modal-overlay {
   position: fixed;
@@ -2469,12 +2464,6 @@ body {
 }
 
 /* Form Styles dentro do modal */
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
 .form-group {
   margin-bottom: 20px;
 }
@@ -2727,10 +2716,6 @@ body {
   
   .modal.large {
     max-width: none;
-  }
-  
-  .form-row {
-    grid-template-columns: 1fr;
   }
   
   .request-header {
