@@ -588,7 +588,8 @@ app.put('/api/users/:id/unlink-employee', authenticateToken, requireAdmin, async
   }
 });
 
-// --- ENDPOINTS DE FUNCIONÁRIOS ---
+// ----------------------------------------------------------- ENDPOINTS DE FUNCIONÁRIOS -----------------------------------------------------//
+
 app.get('/api/employees', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const employees = await db.collection('employees').find({}).toArray(); 
@@ -689,6 +690,77 @@ app.delete('/api/employees/:id', authenticateToken, requireAdmin, async (req, re
   }
 });
 
+app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role === 'admin') {
+      const totalEmployees = await db.collection('employees').countDocuments();
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const todayRecords = await db.collection('time_records')
+        .countDocuments({
+          timestamp: { $gte: today }
+        });
+
+      const recentEmployees = await db.collection('employees')
+        .find()
+        .sort({ created_at: -1 })
+        .limit(5)
+        .toArray();
+
+      res.json({
+        role: 'admin',
+        totalEmployees,
+        todayRecords,
+        recentEmployees
+      });
+    } else {
+      const user = await db.collection('users').findOne({
+        _id: new ObjectId(req.user.id)
+      });
+
+      if (!user || !user.employee_id) {
+        return res.json({
+          role: 'employee',
+          employee: null,
+          todayRecords: 0,
+          recentRecords: []
+        });
+      }
+
+      const employee = await db.collection('employees').findOne({
+        _id: user.employee_id
+      });
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const todayRecords = await db.collection('time_records')
+        .countDocuments({
+          employee_id: user.employee_id,
+          timestamp: { $gte: today }
+        });
+
+      const recentRecords = await db.collection('time_records')
+        .find({
+          employee_id: user.employee_id
+        })
+        .sort({ timestamp: 1 })
+        .limit(5)
+        .toArray();
+
+      res.json({
+        role: 'employee',
+        employee,
+        todayRecords,
+        recentRecords
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // --- ENDPOINTS DE PAUSA ---
 app.get('/api/pause-reasons', authenticateToken, requireEmployee, async (req, res) => {
@@ -700,6 +772,68 @@ app.get('/api/pause-reasons', authenticateToken, requireEmployee, async (req, re
     }
 });
 
+app.put('/api/pause-reasons/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { name, description } = req.body;
+
+  try {
+    const existingReason = await db.collection('pause_reasons').findOne({
+      _id: new ObjectId(id)
+    });
+
+    if (!existingReason) {
+      return res.status(404).json({ error: 'Justificativa não encontrada' });
+    }
+
+    if (name && name !== existingReason.name) {
+      const reasonWithSameName = await db.collection('pause_reasons').findOne({
+        name,
+        _id: { $ne: new ObjectId(id) }
+      });
+
+      if (reasonWithSameName) {
+        return res.status(400).json({ error: 'Já existe uma justificativa com este nome' });
+      }
+    }
+
+    const result = await db.collection('pause_reasons').updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          name,
+          description,
+          updated_at: new Date()
+        }
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Justificativa não encontrada' });
+    }
+
+    const updatedReason = await db.collection('pause_reasons').findOne({ _id: new ObjectId(id) });
+    res.json(updatedReason);
+  } catch (error) {
+    console.error('❌ Erro ao editar justificativa:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/pause-reasons/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await db.collection('pause_reasons').deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Justificativa não encontrada' });
+    }
+
+    res.json({ message: 'Justificativa excluída com sucesso' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // --- ENDPOINT DE REGISTRO DE PONTO (CORRIGIDO) ---
 app.post('/api/time-records', authenticateToken, requireEmployee, async (req, res) => {
