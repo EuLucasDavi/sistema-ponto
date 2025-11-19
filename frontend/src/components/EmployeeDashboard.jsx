@@ -220,7 +220,7 @@ const EmployeeDashboard = () => {
   };
 
   const availableActions = useMemo(() => {
-    if (!todayRecordsList || todayRecordsList.length - 1) {
+    if (!todayRecordsList || todayRecordsList.length -1) {
       return ['entry'];
     }
 
