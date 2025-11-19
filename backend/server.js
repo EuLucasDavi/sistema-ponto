@@ -141,6 +141,12 @@ const adjustDateForTimezone = (date) => {
   return adjusted;
 };
 
+const adjustDateForUTF = (date) => {
+  const adjusted = new Date(date);
+  adjusted.setHours(adjusted.getHours + 3);
+  return adjusted;
+}
+
 const getStartOfDay = (date) => {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -1102,7 +1108,13 @@ app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, 
       .limit(100)
       .toArray();
 
-    res.json(records);
+    const convertedRecords = records.map(record => ({
+      ...record,
+      timestamp: adjustDateForUTF(record.timestamp),
+      created_at: adjustDateForUTF(record.created_at)
+    }));
+
+    res.json(convertedRecords);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
