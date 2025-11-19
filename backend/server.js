@@ -137,15 +137,9 @@ const requireEmployee = (req, res, next) => {
 const adjustDateForTimezone = (date) => {
   const adjusted = new Date(date);
   // Ajusta para o timezone do Brasil (UTC-3)
-  adjusted.setHours(adjusted.getHours() - 3);
+  adjusted.setHours(adjusted.getHours() + 3);
   return adjusted;
 };
-
-const adjustDateForUTF = (date) => {
-  const adjusted = new Date(date);
-  adjusted.setHours(adjusted.getHours + 3);
-  return adjusted;
-}
 
 const getStartOfDay = (date) => {
   const d = new Date(date);
@@ -1104,17 +1098,11 @@ app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, 
 
     const records = await db.collection('time_records')
       .find(query)
-      .sort({ timestamp: -1 })
+      .sort({ timestamp: 1 })
       .limit(100)
       .toArray();
 
-    const convertedRecords = records.map(record => ({
-      ...record,
-      timestamp: adjustDateForUTF(record.timestamp),
-      created_at: adjustDateForUTF(record.created_at)
-    }));
-
-    res.json(convertedRecords);
+    res.json(records);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1122,7 +1110,7 @@ app.get('/api/me/time-records', authenticateToken, requireEmployee, async (req, 
 
 app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req, res) => {
   const { type } = req.body;
-  const timestamp = adjustDateForTimezone(new Date());
+  const timestamp = new Date();
 
   try {
     const user = await db.collection('users').findOne({
@@ -1177,7 +1165,7 @@ app.post('/api/me/time-records', authenticateToken, requireEmployee, async (req,
       employee_id: user.employee_id,
       type,
       timestamp,
-      created_at: adjustDateForTimezone(new Date())
+      created_at: new Date()
     });
 
     const newRecord = await db.collection('time_records').findOne({ _id: result.insertedId });
