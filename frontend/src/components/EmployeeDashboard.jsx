@@ -21,7 +21,7 @@ const EmployeeDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [registerLoading, setRegisterLoading] = useState(false);
   // CORREÇÃO: Inicializado como undefined para controle de estado de carregamento.
-  const [lastRecordType, setLastRecordType] = useState(undefined); 
+  const [lastRecordType, setLastRecordType] = useState(undefined);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastRecord, setLastRecord] = useState(null);
 
@@ -54,7 +54,7 @@ const EmployeeDashboard = () => {
   // NOVO: Efeito para controlar o scroll do body (aplicando a classe .modal-open)
   useEffect(() => {
     const isModalOpen = showAbsenceModal || showTimeRecordModal || showRequestsModal || showPauseModal || showSuccessModal || showErrorModal;
-    
+
     if (isModalOpen) {
       document.body.classList.add('modal-open');
     } else {
@@ -73,7 +73,7 @@ const EmployeeDashboard = () => {
     setRecentRecords([]);
     setTodayRecordsList([]);
     setMyRequests([]);
-    setLastRecordType(undefined); 
+    setLastRecordType(undefined);
     setLastRecord(null);
   };
 
@@ -118,13 +118,17 @@ const EmployeeDashboard = () => {
   const fetchEmployeeData = async () => {
     try {
       const response = await axios.get('/api/dashboard/stats');
-      if (response.data.role === 'employee') {
+      if (response.data.role === 'employee' && response.data.employee) {
         setEmployeeData(response.data.employee);
         setRecentRecords(response.data.recentRecords || []);
+      } else {
+        setEmployeeData(null);
+        setRecentRecords([]);
       }
     } catch (err) {
       console.error('Erro ao buscar dados do funcionário:', err);
-      // Aqui você pode tratar o erro, talvez definindo employeeData como null ou mostrando uma mensagem.
+      setEmployeeData(null);
+      setRecentRecords([]);
     }
   };
 
@@ -144,7 +148,7 @@ const EmployeeDashboard = () => {
       params: { start_date: today, end_date: today }
     });
     setTodayRecordsList(response.data);
-    
+
     // Define o último registro e o tipo
     if (response.data.length > 0) {
       setLastRecordType(response.data[0].type);
@@ -186,8 +190,8 @@ const EmployeeDashboard = () => {
     // Mapeia a ação de Retorno
     if (type === 'return') {
       apiType = 'entry'; // Envia 'entry' para o backend
-    } 
-    
+    }
+
     // Se for pausa, abre o modal
     if (type === 'pause') {
       setShowPauseModal(true);
@@ -196,18 +200,18 @@ const EmployeeDashboard = () => {
 
     setRegisterLoading(true);
     closeAllModals();
-    
+
 
     try {
       const response = await axios.post('/api/time-records', { type: apiType, ...payload });
 
       const actionText = apiType === 'entry' ? (type === 'return' ? 'Retorno' : 'Entrada') : (apiType === 'exit' ? 'Saída' : response.data.type);
-      
+
       showSuccessMessage(
         'Ponto Registrado!',
         `Seu registro de ${actionText} foi efetuado com sucesso.`
       );
-      
+
       // Atualiza os dados para recalcular o estado dos botões
       await fetchAllData();
 
@@ -218,13 +222,13 @@ const EmployeeDashboard = () => {
       setRegisterLoading(false);
     }
   };
-  
+
   const handlePauseSubmit = async () => {
     if (!pauseForm.reason) {
       showErrorMessage('Erro de Pausa', 'Motivo da pausa é obrigatório.');
       return;
     }
-    
+
     const pausePayload = {
       type: 'pause',
       pause_reason_id: pauseForm.reason,
@@ -233,7 +237,7 @@ const EmployeeDashboard = () => {
 
     setRegisterLoading(true);
     setShowPauseModal(false);
-    
+
 
     try {
       await axios.post('/api/time-records', pausePayload);
@@ -242,7 +246,7 @@ const EmployeeDashboard = () => {
         'Pausa Registrada!',
         `Seu registro de Pausa foi efetuado com sucesso por: ${pauseForm.reason === 'outro' ? pauseForm.description : pauseReasons.find(r => r._id === pauseForm.reason)?.name}.`
       );
-      
+
       // Reseta e atualiza
       setPauseForm({ reason: '', description: '' });
       await fetchAllData();
@@ -268,7 +272,7 @@ const EmployeeDashboard = () => {
     });
     setAbsenceForm({ date: '', reason: '', description: '' });
   };
-  
+
   const handleTimeRecordSubmit = async (e) => {
     e.preventDefault();
     if (!timeRecordForm.date || !timeRecordForm.time || !timeRecordForm.reason) {
@@ -298,7 +302,7 @@ const EmployeeDashboard = () => {
       setRegisterLoading(false);
     }
   };
-  
+
   const pendingRequestsCount = myRequests.filter(r => r.status === 'pending').length;
 
   // Helper function to render action buttons (Usando classes do App.css: .btn-large)
@@ -344,9 +348,9 @@ const EmployeeDashboard = () => {
       exit: { class: 'exit', text: 'Saída', icon: <FiLogOut size={14} /> },
       pause: { class: 'pause', text: 'Pausa', icon: <FiPauseCircle size={14} /> },
     };
-    
+
     const config = typeConfig[type] || { class: 'secondary', text: 'Ponto', icon: <FiClock size={14} /> };
-    
+
     return (
       <span className={`record-type ${config.class}`}>
         {config.icon}
@@ -358,7 +362,7 @@ const EmployeeDashboard = () => {
   // Helper function to display request type/status badges (Usando classes do App.css: .badge)
   const renderRequestBadges = (type, status) => {
     let config = { type: type, text: 'Solicitação', icon: <FiFileText size={14} /> };
-    
+
     switch (type) {
       case 'absence':
         config = { class: 'info', text: 'Ausência', icon: <FiCalendar size={14} /> };
@@ -398,7 +402,7 @@ const EmployeeDashboard = () => {
       </div>
     );
   };
-  
+
   if (loading || lastRecordType === undefined) {
     return (
       <div className="loading-page">
@@ -439,7 +443,7 @@ const EmployeeDashboard = () => {
                 <FiWatch size={24} />
                 <h3>Registro de Ponto</h3>
               </div>
-              
+
               {/* Display de Hora Atual */}
               <div className="current-time">
                 <div className="time-display">{currentTime.toLocaleTimeString('pt-BR')}</div>
@@ -450,7 +454,7 @@ const EmployeeDashboard = () => {
               <div className="time-buttons">
                 {registerLoading ? (
                   <button className="btn btn-secondary btn-large" disabled>
-                    <span className="loading-spinner" style={{ width: '20px', height: '20px', border: '2px solid white', borderTopColor: 'transparent' }}></span> 
+                    <span className="loading-spinner" style={{ width: '20px', height: '20px', border: '2px solid white', borderTopColor: 'transparent' }}></span>
                     Carregando Ações
                   </button>
                 ) : (
@@ -466,7 +470,7 @@ const EmployeeDashboard = () => {
                   )
                 )}
               </div>
-              
+
               {/* Último Registro */}
               <div className="last-record-card">
                 <p className="text-muted" style={{ margin: '0' }}>
@@ -508,7 +512,7 @@ const EmployeeDashboard = () => {
 
           {/* Grid de Informações e Registros */}
           <div className="reports-grid" style={{ marginTop: '25px' }}>
-            
+
             {/* Estatísticas Chave */}
             <div className="card">
               <div className="section-header">
@@ -578,7 +582,7 @@ const EmployeeDashboard = () => {
                           <td>{renderRequestBadges(request.type, request.status)}</td>
                           <td>
                             {request.type === 'absence' ? `Data: ${new Date(request.date).toLocaleDateString('pt-BR')}` : `Ponto: ${new Date(request.date).toLocaleDateString('pt-BR')} ${request.time}`}
-                            <br/>
+                            <br />
                             <span className="text-muted">Motivo: {request.reason}</span>
                           </td>
                           <td>{new Date(request.createdAt).toLocaleDateString('pt-BR')}</td>
@@ -597,7 +601,7 @@ const EmployeeDashboard = () => {
           </div>
 
           {/* MODAIS */}
-          
+
           {/* Modal de Pausa */}
           {showPauseModal && (
             <div className="modal-overlay">
@@ -626,20 +630,20 @@ const EmployeeDashboard = () => {
                   {(pauseForm.reason === 'outro') && (
                     <div className="form-group">
                       <label>Descrição *</label>
-                      <input 
-                        type="text" 
-                        value={pauseForm.description} 
-                        onChange={(e) => setPauseForm({ ...pauseForm, description: e.target.value })} 
-                        required 
+                      <input
+                        type="text"
+                        value={pauseForm.description}
+                        onChange={(e) => setPauseForm({ ...pauseForm, description: e.target.value })}
+                        required
                         placeholder="Descreva o motivo da pausa"
                       />
                     </div>
                   )}
                   <div className="modal-footer" style={{ borderTop: 'none', background: 'white', padding: '0' }}>
                     <button className="btn btn-secondary" onClick={() => setShowPauseModal(false)}>Cancelar</button>
-                    <button 
-                      className="btn btn-primary" 
-                      disabled={!pauseForm.reason || (pauseForm.reason === 'outro' && !pauseForm.description) || registerLoading} 
+                    <button
+                      className="btn btn-primary"
+                      disabled={!pauseForm.reason || (pauseForm.reason === 'outro' && !pauseForm.description) || registerLoading}
                       onClick={handlePauseSubmit}
                     >
                       <FiSave size={16} /> {registerLoading ? 'Registrando...' : 'Confirmar Pausa'}
@@ -679,10 +683,10 @@ const EmployeeDashboard = () => {
                             <tr key={index}>
                               <td>{renderRequestBadges(request.type, request.status)}</td>
                               <td>
-                                {request.type === 'absence' 
-                                  ? `Data: ${new Date(request.date).toLocaleDateString('pt-BR')}` 
+                                {request.type === 'absence'
+                                  ? `Data: ${new Date(request.date).toLocaleDateString('pt-BR')}`
                                   : `Ponto: ${new Date(request.date).toLocaleDateString('pt-BR')} ${request.time}`}
-                                <br/>
+                                <br />
                                 <span className="text-muted">Motivo: {request.reason}</span>
                                 {request.description && <p className="text-muted" style={{ margin: '5px 0 0 0' }}>* {request.description}</p>}
                               </td>
@@ -714,18 +718,18 @@ const EmployeeDashboard = () => {
                     <p className="text-muted" style={{ marginBottom: '20px' }}>Use este formulário para solicitar dias de ausência ou férias.</p>
                     <div className="form-group">
                       <label>Data de Ausência *</label>
-                      <input 
-                        type="date" 
-                        value={absenceForm.date} 
-                        onChange={(e) => setAbsenceForm({...absenceForm, date: e.target.value})} 
-                        required 
+                      <input
+                        type="date"
+                        value={absenceForm.date}
+                        onChange={(e) => setAbsenceForm({ ...absenceForm, date: e.target.value })}
+                        required
                       />
                     </div>
                     <div className="form-group">
                       <label>Motivo *</label>
-                      <select 
-                        value={absenceForm.reason} 
-                        onChange={(e) => setAbsenceForm({...absenceForm, reason: e.target.value})} 
+                      <select
+                        value={absenceForm.reason}
+                        onChange={(e) => setAbsenceForm({ ...absenceForm, reason: e.target.value })}
                         required
                       >
                         <option value="">Selecione o motivo</option>
@@ -737,9 +741,9 @@ const EmployeeDashboard = () => {
                     </div>
                     <div className="form-group">
                       <label>Detalhes/Descrição</label>
-                      <textarea 
-                        value={absenceForm.description} 
-                        onChange={(e) => setAbsenceForm({...absenceForm, description: e.target.value})} 
+                      <textarea
+                        value={absenceForm.description}
+                        onChange={(e) => setAbsenceForm({ ...absenceForm, description: e.target.value })}
                         rows="3"
                         style={{ height: 'auto', minHeight: '100px' }}
                       ></textarea>
@@ -769,27 +773,27 @@ const EmployeeDashboard = () => {
                     <p className="text-muted" style={{ marginBottom: '20px' }}>Preencha o formulário para solicitar o registro de um ponto que você esqueceu de bater.</p>
                     <div className="form-group">
                       <label>Data do Ponto *</label>
-                      <input 
-                        type="date" 
-                        value={timeRecordForm.date} 
-                        onChange={(e) => setTimeRecordForm({...timeRecordForm, date: e.target.value})} 
-                        required 
+                      <input
+                        type="date"
+                        value={timeRecordForm.date}
+                        onChange={(e) => setTimeRecordForm({ ...timeRecordForm, date: e.target.value })}
+                        required
                       />
                     </div>
                     <div className="form-group">
                       <label>Hora do Ponto *</label>
-                      <input 
-                        type="time" 
-                        value={timeRecordForm.time} 
-                        onChange={(e) => setTimeRecordForm({...timeRecordForm, time: e.target.value})} 
-                        required 
+                      <input
+                        type="time"
+                        value={timeRecordForm.time}
+                        onChange={(e) => setTimeRecordForm({ ...timeRecordForm, time: e.target.value })}
+                        required
                       />
                     </div>
                     <div className="form-group">
                       <label>Motivo *</label>
-                      <select 
-                        value={timeRecordForm.reason} 
-                        onChange={(e) => setTimeRecordForm({...timeRecordForm, reason: e.target.value})} 
+                      <select
+                        value={timeRecordForm.reason}
+                        onChange={(e) => setTimeRecordForm({ ...timeRecordForm, reason: e.target.value })}
                         required
                       >
                         <option value="">Selecione o motivo</option>
@@ -801,9 +805,9 @@ const EmployeeDashboard = () => {
                     </div>
                     <div className="form-group">
                       <label>Detalhes/Descrição</label>
-                      <textarea 
-                        value={timeRecordForm.description} 
-                        onChange={(e) => setTimeRecordForm({...timeRecordForm, description: e.target.value})} 
+                      <textarea
+                        value={timeRecordForm.description}
+                        onChange={(e) => setTimeRecordForm({ ...timeRecordForm, description: e.target.value })}
                         rows="3"
                         style={{ height: 'auto', minHeight: '100px' }}
                       ></textarea>
@@ -862,9 +866,12 @@ const EmployeeDashboard = () => {
             <FiAlertCircle size={24} />
             <h3>Funcionário Não Vinculado</h3>
           </div>
-          <p>Seu usuário não está vinculado a um funcionário. Contate o administrador.</p>
+          <p>Seu usuário não está vinculado a um funcionário válido. Contate o administrador.</p>
           <div className="quick-actions">
-            <button className="btn btn-primary"><FiUser size={18} /><span>Contatar Administrador</span></button>
+            <button className="btn btn-primary">
+              <FiUser size={18} />
+              <span>Contatar Administrador</span>
+            </button>
           </div>
         </div>
       )}
