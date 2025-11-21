@@ -169,22 +169,22 @@ body {
 .btn-secondary:hover { background-color: #545b62; }
 
 .btn-success { 
-  background: linear-gradient(135deg, #28a745, #20c997);
+  background: #28a745;
   color: white; 
   border: none;
   animation: infinite;
 }
 .btn-success:hover { 
-  background: linear-gradient(135deg, #218838, #1e7e34);
+  background: #218838;
 }
 
 .btn-danger { 
-  background: linear-gradient(135deg, #dc3545, #e83e8c);
+  background: #dc3545;
   color: white; 
   border: none;
 }
 .btn-danger:hover { 
-  background: linear-gradient(135deg, #c82333, #d91a7a);
+  background: #c82333;
 }
 
 .btn-warning { 

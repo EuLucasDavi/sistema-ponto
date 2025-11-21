@@ -212,20 +212,36 @@ const EmployeeDashboard = () => {
     }
   };
 
+  const getButtonLabel = (actionKey) => {
+    switch (actionKey) {
+      case 'entry_start':
+        return 'Registrar Entrada';
+      case 'entry_return':
+        return 'Retornar da Pausa'; // ou 'Reentrada', mais descritivo para o usuário
+      case 'pause':
+        return 'Pausa';
+      case 'exit':
+        return 'Registrar Saída';
+      default:
+        return 'Registrar Entrada';
+    }
+  };
+
   const getAvailableActions = (currentLastRecordType) => {
-    if (!currentLastRecordType) {
-      return ['entry']; // Primeiro registro do dia - apenas entrada
+    if (!currentLastRecordType || currentLastRecordType === 'exit') {
+      return [{ type: 'entry', label_key: 'entry_start' }];
     }
 
     switch (currentLastRecordType) {
       case 'entry':
-        return ['pause', 'exit']; // Após entrada: pode pausar ou sair
+        return [
+          { type: 'pause', label_key: 'pause' },
+          { type: 'exit', label_key: 'exit' }
+        ];
       case 'pause':
-        return ['entry']; // Após pausa: pode apenas RETORNAR (entrada)
-      case 'exit':
-        return ['entry']; // Após saída: pode iniciar novo turno (entrada)
+        return [{ type: 'entry', label_key: 'entry_return' }];
       default:
-        return ['entry'];
+        return [{ type: 'entry', label_key: 'entry_start' }];
     }
   };
 
@@ -463,57 +479,35 @@ const EmployeeDashboard = () => {
               </div>
 
               <div className="time-buttons">
-                {availableActions.includes('entry') && (
+                {availableActions.map(action => (
                   <button
-                    className="btn btn-success btn-large"
-                    onClick={() => registerTime('entry')}
+                    // Usa a label_key como chave única
+                    key={action.label_key}
+                    // Usa a propriedade 'color' definida na função getAvailableActions
+                    className={`btn btn-${action.color} btn-large`}
+                    // Se for pausa, abre o modal, senão chama registerTime com o tipo correto ('entry', 'pause' ou 'exit')
+                    onClick={() => action.type === 'pause' ? setShowPauseModal(true) : registerTime(action.type)}
                     disabled={registerLoading}
                   >
+                    {/* 1. Estado de Carregamento (Loading) */}
                     {registerLoading ? (
                       <>
                         <div className="loading-spinner"></div>
                         <span>Registrando...</span>
                       </>
-                    ) : lastRecordType === 'pause' ? (
-                      <>
-                        <FiLogIn size={20} />
-                        <span>Retornar do Almoço</span>
-                      </>
-                    ) : lastRecordType === 'exit' ? (
-                      <>
-                        <FiLogIn size={20} />
-                        <span>Novo Turno</span>
-                      </>
                     ) : (
                       <>
-                        <FiLogIn size={20} />
-                        <span>Registrar Entrada</span>
+                        {/* 2. Ícone baseado no tipo de registro */}
+                        {action.type === 'entry' && <FiLogIn size={20} />}
+                        {action.type === 'pause' && <FiPauseCircle size={20} />}
+                        {action.type === 'exit' && <FiLogOut size={20} />}
+
+                        {/* 3. Rótulo correto usando a função auxiliar e a label_key */}
+                        <span>{getButtonLabel(action.label_key)}</span>
                       </>
                     )}
                   </button>
-                )}
-
-                {availableActions.includes('pause') && (
-                  <button
-                    className="btn btn-warning btn-large"
-                    onClick={() => setShowPauseModal(true)}
-                    disabled={registerLoading}
-                  >
-                    <FiPauseCircle size={20} />
-                    <span>Registrar Pausa</span>
-                  </button>
-                )}
-
-                {availableActions.includes('exit') && (
-                  <button
-                    className="btn btn-danger btn-large"
-                    onClick={() => registerTime('exit')}
-                    disabled={registerLoading}
-                  >
-                    <FiLogOut size={20} />
-                    <span>Registrar Saída</span>
-                  </button>
-                )}
+                ))}
               </div>
 
               <div className="request-buttons" style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
