@@ -212,13 +212,12 @@ const EmployeeDashboard = () => {
     }
   };
 
-  const getButtonLabel = (action, todayRecords) => {
+  const getButtonLabel = (action, todayRecordsList) => {
     switch (action.label_key) {
       case 'entry_start':
         return 'Registrar Entrada';
       case 'entry_return':
-        // Conta quantas pausas já foram feitas hoje para determinar o texto
-        const pauseCount = todayRecords.filter(record => record.type === 'pause').length;
+        const pauseCount = todayRecordsList.filter(record => record.type === 'pause').length;
         return pauseCount === 1 ? 'Retornar do Almoço' : 'Retornar da Pausa';
       case 'pause':
         return 'Iniciar Pausa';
@@ -229,52 +228,41 @@ const EmployeeDashboard = () => {
     }
   };
 
-  const getAvailableActions = (currentLastRecordType, todayRecords) => {
-    // Se não há registros hoje, só pode fazer entrada
-    if (!todayRecords || todayRecords.length === 0) {
+  const getAvailableActions = (currentLastRecordType) => {
+    // 1. Se não há registros (null) ou o último foi saída, o próximo é Entrada
+    if (!currentLastRecordType || currentLastRecordType === 'exit') {
       return [{ type: 'entry', label_key: 'entry_start', color: 'success' }];
     }
 
-    const lastRecord = todayRecords[todayRecords.length - 1];
-
-    // Lógica baseada no último registro
-    switch (lastRecord.type) {
+    // Lógica baseada no último registro (usando apenas o parâmetro type)
+    switch (currentLastRecordType) {
       case 'entry':
-        // Após entrada: pode pausar ou sair
+        // 2. Após entrada (inicial ou reentrada): pode pausar ou sair
         return [
           { type: 'pause', label_key: 'pause', color: 'warning' },
           { type: 'exit', label_key: 'exit', color: 'danger' }
         ];
 
       case 'pause':
-        // Após pausa: pode retornar (nova entrada)
+        // 3. Após pausa: pode retornar (nova entrada/reentrada)
         return [{ type: 'entry', label_key: 'entry_return', color: 'success' }];
-
-      case 'exit':
-        // Após saída: pode iniciar novo turno (nova entrada)
-        return [{ type: 'entry', label_key: 'entry_start', color: 'success' }];
 
       default:
         return [{ type: 'entry', label_key: 'entry_start', color: 'success' }];
     }
   };
 
-  const getStatusMessage = (lastRecordType, todayRecords) => {
-    if (!todayRecords || todayRecords.length === 0) {
+  const getStatusMessage = (lastRecordType) => {
+    if (!lastRecordType || lastRecordType === 'exit') {
       return '🟡 Aguardando entrada (Início do Turno)';
     }
 
-    const lastRecord = todayRecords[todayRecords.length - 1];
-
-    switch (lastRecord.type) {
+    switch (lastRecordType) {
       case 'entry':
         return '🟢 Em Trabalho';
 
       case 'pause':
         return '🟠 Em Pausa';
-
-      case 'exit':
-        return '🔴 Expediente Encerrado';
 
       default:
         return '🟡 Status Desconhecido';
@@ -416,8 +404,8 @@ const EmployeeDashboard = () => {
     );
   };
 
-  const availableActions = getAvailableActions(lastRecordType, todayRecordsList);
-  const statusMessage = getStatusMessage(lastRecordType, todayRecordsList);
+  const availableActions = getAvailableActions(lastRecordType);
+  const statusMessage = getStatusMessage(lastRecordType);
   const pendingRequestsCount = myRequests.filter(req => req.status === 'pending').length;
 
   if (loading) {
