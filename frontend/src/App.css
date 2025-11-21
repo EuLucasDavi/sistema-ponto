@@ -2770,7 +2770,6 @@ body {
   border-left-color: #dc3545;
 }
 
-/* ===== TABELAS ESPECÍFICAS PARA GESTÃO DE FUNCIONÁRIOS ===== */
 .employee-table {
   background: white;
   border-radius: 12px;
@@ -2831,7 +2830,6 @@ body {
   color: #2c3e50;
 }
 
-/* Células específicas */
 .employee-table .date-cell {
   display: flex;
   align-items: center;
@@ -2845,27 +2843,8 @@ body {
   opacity: 0.7;
 }
 
-/* Coluna de Ações */
 .employee-actions {
   width: 180px;
-}
-
-.employee-actions .action-buttons {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.employee-actions .btn-small {
-  padding: 8px 12px;
-  font-size: 12px;
-  min-height: 32px;
-  min-width: 32px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  transition: all 0.3s ease;
 }
 
 .employee-actions .btn-edit {
@@ -2880,19 +2859,6 @@ body {
   box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
 }
 
-.employee-actions .btn-danger {
-  background: #dc3545;
-  color: white;
-  border: none;
-}
-
-.employee-actions .btn-danger:hover {
-  background: #c82333;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
-}
-
-/* Estados vazios */
 .employee-table .empty-state {
   padding: 60px 20px;
   text-align: center;
@@ -2923,7 +2889,6 @@ body {
   font-size: 0.95em;
 }
 
-/* Badge para formato de excedente */
 .overtime-badge {
   display: inline-flex;
   align-items: center;
@@ -2947,7 +2912,6 @@ body {
   border: 1px solid #b3d7ff;
 }
 
-/* Alertas */
 .alert {
   padding: 16px 20px;
   border-radius: 8px;
