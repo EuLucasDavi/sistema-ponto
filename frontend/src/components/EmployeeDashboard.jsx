@@ -166,70 +166,46 @@ const EmployeeDashboard = () => {
     }
   };
 
-  const fetchTodayRecords = async () => {
-    try {
-      const today = new Date();
-      const offset = today.getTimezoneOffset();
-      const localToday = new Date(today.getTime() - (offset * 60 * 1000));
-      const todayStr = localToday.toISOString().split('T')[0];
+  // EmployeeDashboard.jsx
 
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/me/time-records`, {
-        params: {
-          start_date: todayStr,
-          end_date: todayStr
-        },
-        withCredentials: true
-      });
+const fetchTodayRecords = async () => {
+  try {
+    // --- CORREÇÃO DE FUSO HORÁRIO ---
+    const today = new Date();
+    // Pega ano, mês e dia locais (do computador do usuário)
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    
+    // Monta a string "YYYY-MM-DD" garantindo que seja o dia de hoje no Brasil
+    const todayStr = `${year}-${month}-${day}`;
+    // --------------------------------
 
-      setTodayRecordsList(response.data);
+    console.log("Buscando registros para data local:", todayStr); // Para debug no F12
 
-      if (response.data.length > 0) {
-        const lastRecordToday = response.data[response.data.length - 1];
-        setLastRecordType(lastRecordToday.type);
-      } else {
-        setLastRecordType(null);
+    const response = await axios.get('/api/me/time-records', {
+      params: {
+        start_date: todayStr,
+        end_date: todayStr
       }
-    } catch (error) {
-      console.error('Erro ao buscar registros de hoje:', error);
+    });
+
+    setTodayRecordsList(response.data);
+
+    if (response.data.length > 0) {
+      const lastRecordToday = response.data[response.data.length - 1];
+      console.log("Último registro encontrado:", lastRecordToday.type); // Para debug
+      setLastRecordType(lastRecordToday.type);
+      setLastRecord(lastRecordToday); // Atualiza também o objeto completo se necessário
+    } else {
+      console.log("Nenhum registro encontrado para hoje.");
       setLastRecordType(null);
-      // throw error; // Comentei para não travar a UI se falhar
     }
-  };
-
-  const fetchRecentRecords = async () => {
-    try {
-      const today = new Date();
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
-      const response = await axios.get('/api/me/time-records', {
-        params: {
-          start_date: firstDay.toISOString().split('T')[0],
-          end_date: lastDay.toISOString().split('T')[0]
-        }
-      });
-      setRecentRecords(response.data);
-    } catch (error) {
-      console.error('Erro ao buscar registros:', error);
-      throw error;
-    }
-  };
-
-  const getButtonLabel = (action, todayRecordsList) => {
-    switch (action.label_key) {
-      case 'entry_start':
-        return 'Registrar Entrada';
-      case 'entry_return':
-        const pauseCount = todayRecordsList.filter(record => record.type === 'pause').length;
-        return pauseCount === 1 ? 'Retornar do Almoço' : 'Retornar da Pausa';
-      case 'pause':
-        return 'Iniciar Pausa';
-      case 'exit':
-        return 'Registrar Saída';
-      default:
-        return 'Registrar';
-    }
-  };
+  } catch (error) {
+    console.error('Erro ao buscar registros de hoje:', error);
+    setLastRecordType(null);
+  }
+};
 
   const getAvailableActions = (currentLastRecordType) => {
     // Se null ou 'exit', mostra Entrada
