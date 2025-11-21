@@ -169,13 +169,16 @@ const EmployeeDashboard = () => {
   const fetchTodayRecords = async () => {
     try {
       const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
+      const offset = today.getTimezoneOffset();
+      const localToday = new Date(today.getTime() - (offset * 60 * 1000));
+      const todayStr = localToday.toISOString().split('T')[0];
 
-      const response = await axios.get('/api/me/time-records', {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/me/time-records`, {
         params: {
           start_date: todayStr,
           end_date: todayStr
-        }
+        },
+        withCredentials: true
       });
 
       setTodayRecordsList(response.data);
@@ -189,7 +192,7 @@ const EmployeeDashboard = () => {
     } catch (error) {
       console.error('Erro ao buscar registros de hoje:', error);
       setLastRecordType(null);
-      throw error;
+      // throw error; // Comentei para não travar a UI se falhar
     }
   };
 
@@ -229,22 +232,21 @@ const EmployeeDashboard = () => {
   };
 
   const getAvailableActions = (currentLastRecordType) => {
-    // 1. Se não há registros (null) ou o último foi saída, o próximo é Entrada
+    // Se null ou 'exit', mostra Entrada
     if (!currentLastRecordType || currentLastRecordType === 'exit') {
       return [{ type: 'entry', label_key: 'entry_start', color: 'success' }];
     }
 
-    // Lógica baseada no último registro (usando apenas o parâmetro type)
     switch (currentLastRecordType) {
       case 'entry':
-        // 2. Após entrada (inicial ou reentrada): pode pausar ou sair
+        // Se já deu entrada, mostra Pausa e Saída
         return [
           { type: 'pause', label_key: 'pause', color: 'warning' },
           { type: 'exit', label_key: 'exit', color: 'danger' }
         ];
 
       case 'pause':
-        // 3. Após pausa: pode retornar (nova entrada/reentrada)
+        // Se está em pausa, mostra Retorno
         return [{ type: 'entry', label_key: 'entry_return', color: 'success' }];
 
       default:
@@ -287,6 +289,7 @@ const EmployeeDashboard = () => {
         response = await axios.post('/api/me/time-records', { type });
       }
 
+      setLastRecordType(type);
       // Recarregar TODOS os dados do servidor
       await fetchAllData();
 
