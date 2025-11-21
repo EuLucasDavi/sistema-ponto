@@ -2770,3 +2770,110 @@ body {
 .status-indicator.exit {
   border-left-color: #dc3545;
 }
+
+/* ADICIONAR estas classes ao App.css */
+
+/* Seção de dicas para Employee Management */
+.employee-management-tips {
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border: 1px solid #e9ecef;
+  margin-top: 30px;
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* Badges para formato de horas extras */
+.badge-time-bank {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.badge-overtime {
+  background: #cce7ff;
+  color: #004085;
+  border: 1px solid #b3d7ff;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Ajustes para os botões de ação na tabela */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* Ajustes para a grid do formulário em mobile */
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+    padding: 0 15px;
+  }
+  
+  .form-header {
+    padding: 20px 15px 0;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+}
+
+/* Ajustes específicos para EmployeeManagement */
+.employee-email {
+  color: #007bff;
+  font-size: 0.9em;
+}
+
+.employee-salary {
+  font-weight: 600;
+  color: #28a745;
+}
+
+.employee-department .department-badge {
+  background: #e9ecef;
+  color: #495057;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  display: inline-block;
+}
+
+/* Corrigir o container do form-overlay */
+.form-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.form-overlay .form-container {
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  margin: 0;
+}
