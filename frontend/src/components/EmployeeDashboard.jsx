@@ -1,32 +1,45 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  FiUser, FiClock, FiCalendar, FiBriefcase, FiLogIn, FiLogOut,
-  FiCheckCircle, FiAlertCircle, FiInfo, FiArrowRight, FiHome,
-  FiTrendingUp, FiPauseCircle, FiWatch, FiX, FiFileText, FiSave, FiEye, FiCheck
+  FiUser,
+  FiClock,
+  FiCalendar,
+  FiBriefcase,
+  FiLogIn,
+  FiLogOut,
+  FiCheckCircle,
+  FiAlertCircle,
+  FiInfo,
+  FiArrowRight,
+  FiHome,
+  FiTrendingUp,
+  FiPauseCircle,
+  FiWatch,
+  FiX,
+  FiFileText,
+  FiCheck,
+  FiEye
 } from 'react-icons/fi';
-
-// Funções de formatação (adicionadas/completadas para o componente funcionar)
-const formatTime = (dateString) => new Date(dateString).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-const formatDate = (dateString) => new Date(dateString).toLocaleDateString('pt-BR');
-
 
 const EmployeeDashboard = () => {
   const [employeeData, setEmployeeData] = useState(null);
   const [recentRecords, setRecentRecords] = useState([]);
+  const [todayRecords, setTodayRecords] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [lastRecord, setLastRecord] = useState(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [lastRecordType, setLastRecordType] = useState(null);
   const [todayRecordsList, setTodayRecordsList] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
   const [pauseReasons, setPauseReasons] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [registerLoading, setRegisterLoading] = useState(false);
-  // CORREÇÃO: Inicializado como undefined para controle de estado de carregamento.
-  const [lastRecordType, setLastRecordType] = useState(undefined);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [lastRecord, setLastRecord] = useState(null);
 
+  // Obter usuário atual do contexto de autenticação
   const { user } = useAuth();
 
+  // Estados para os modais
   const [showAbsenceModal, setShowAbsenceModal] = useState(false);
   const [showTimeRecordModal, setShowTimeRecordModal] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
@@ -35,10 +48,26 @@ const EmployeeDashboard = () => {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [modalContent, setModalContent] = useState({ title: '', message: '' });
 
-  const [absenceForm, setAbsenceForm] = useState({ date: '', reason: '', description: '' });
-  const [timeRecordForm, setTimeRecordForm] = useState({ date: '', time: '', reason: '', description: '' });
-  const [pauseForm, setPauseForm] = useState({ reason: '', description: '' });
+  // Estados dos formulários
+  const [absenceForm, setAbsenceForm] = useState({
+    date: '',
+    reason: '',
+    description: ''
+  });
 
+  const [timeRecordForm, setTimeRecordForm] = useState({
+    date: '',
+    time: '',
+    reason: '',
+    description: ''
+  });
+
+  const [pauseForm, setPauseForm] = useState({
+    reason: '',
+    description: ''
+  });
+
+  // Resetar estado quando o usuário mudar
   useEffect(() => {
     if (user) {
       resetState();
@@ -46,576 +75,639 @@ const EmployeeDashboard = () => {
     }
   }, [user?.id]);
 
+  // Timer para atualizar hora atual
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
     return () => clearInterval(timer);
   }, []);
 
-  // NOVO: Efeito para controlar o scroll do body (aplicando a classe .modal-open)
-  useEffect(() => {
-    const isModalOpen = showAbsenceModal || showTimeRecordModal || showRequestsModal || showPauseModal || showSuccessModal || showErrorModal;
-
-    if (isModalOpen) {
-      document.body.classList.add('modal-open');
-    } else {
-      document.body.classList.remove('modal-open');
-    }
-
-    // Função de limpeza
-    return () => {
-      document.body.classList.remove('modal-open');
-    };
-  }, [showAbsenceModal, showTimeRecordModal, showRequestsModal, showPauseModal, showSuccessModal, showErrorModal]);
-  // FIM NOVO EFEITO
-
-  const resetState = () => {
-    setEmployeeData(null);
-    setRecentRecords([]);
-    setTodayRecordsList([]);
-    setMyRequests([]);
-    setLastRecordType(undefined);
-    setLastRecord(null);
-  };
-
-  const closeAllModals = () => {
-    setShowSuccessModal(false);
-    setShowErrorModal(false);
-    setShowPauseModal(false);
-    setShowAbsenceModal(false);
-    setShowTimeRecordModal(false);
-    setShowRequestsModal(false);
-    setModalContent({ title: '', message: '' });
-  };
-
+  // NOVAS FUNÇÕES: Modais de confirmação
   const showSuccessMessage = (title, message) => {
-    closeAllModals();
     setModalContent({ title, message });
     setShowSuccessModal(true);
   };
 
   const showErrorMessage = (title, message) => {
-    closeAllModals();
     setModalContent({ title, message });
     setShowErrorModal(true);
+  };
+
+  const closeModals = () => {
+    setShowSuccessModal(false);
+    setShowErrorModal(false);
+    setModalContent({ title: '', message: '' });
   };
 
   const fetchAllData = async () => {
     try {
       setLoading(true);
+      setError('');
+
       await Promise.all([
         fetchEmployeeData(),
         fetchTodayRecords(),
         fetchMyRequests(),
         fetchPauseReasons()
       ]);
-    } catch (err) {
-      console.error('Erro ao buscar todos os dados:', err);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      showErrorMessage('Erro', 'Erro ao carregar dados do sistema');
     } finally {
       setLoading(false);
     }
   };
 
+  const resetState = () => {
+    setEmployeeData(null);
+    setRecentRecords([]);
+    setTodayRecords(0);
+    setLastRecord(null);
+    setLastRecordType(null);
+    setTodayRecordsList([]);
+    setMyRequests([]);
+    setError('');
+  };
+
   const fetchEmployeeData = async () => {
     try {
       const response = await axios.get('/api/dashboard/stats');
-      if (response.data.role === 'employee' && response.data.employee) {
+
+      if (response.data.role === 'employee') {
         setEmployeeData(response.data.employee);
+        setTodayRecords(response.data.todayRecords);
         setRecentRecords(response.data.recentRecords || []);
-      } else {
-        setEmployeeData(null);
-        setRecentRecords([]);
       }
-    } catch (err) {
-      console.error('Erro ao buscar dados do funcionário:', err);
-      setEmployeeData(null);
-      setRecentRecords([]);
+    } catch (error) {
+      console.error('Erro ao buscar dados do funcionário:', error);
+      throw error;
     }
   };
 
   const fetchMyRequests = async () => {
-    const response = await axios.get('/api/requests');
-    setMyRequests(response.data);
+    try {
+      const response = await axios.get('/api/requests');
+      setMyRequests(response.data);
+    } catch (error) {
+      console.error('Erro ao buscar solicitações:', error);
+      throw error;
+    }
   };
 
   const fetchPauseReasons = async () => {
-    const response = await axios.get('/api/pause-reasons');
-    setPauseReasons(response.data);
+    try {
+      const response = await axios.get('/api/pause-reasons');
+      setPauseReasons(response.data);
+    } catch (error) {
+      console.error('Erro ao buscar justificativas:', error);
+      throw error;
+    }
   };
 
   const fetchTodayRecords = async () => {
-    const today = new Date().toISOString().split('T')[0];
-    const response = await axios.get('/api/me/time-records', {
-      params: { start_date: today, end_date: today }
-    });
-    setTodayRecordsList(response.data);
+    try {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
 
-    // Define o último registro e o tipo
-    if (response.data.length > 0) {
-      setLastRecordType(response.data[0].type);
-      setLastRecord(response.data[0]);
-    } else {
-      setLastRecordType(null); // Nenhum registro hoje
-      setLastRecord(null);
+      const response = await axios.get('/api/me/time-records', {
+        params: {
+          start_date: todayStr,
+          end_date: todayStr
+        }
+      });
+
+      setTodayRecordsList(response.data);
+
+      if (response.data.length > 0) {
+        const lastRecordToday = response.data[response.data.length - 1];
+        setLastRecordType(lastRecordToday.type);
+      } else {
+        setLastRecordType(null);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar registros de hoje:', error);
+      setLastRecordType(null);
+      throw error;
     }
   };
 
-  // CORREÇÃO: Lógica para determinar as ações de ponto disponíveis
-  const availableActions = useMemo(() => {
-    if (lastRecordType === undefined) {
-      // Estado inicial (carregando)
-      return [];
+  const fetchRecentRecords = async () => {
+    try {
+      const today = new Date();
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+      const response = await axios.get('/api/me/time-records', {
+        params: {
+          start_date: firstDay.toISOString().split('T')[0],
+          end_date: lastDay.toISOString().split('T')[0]
+        }
+      });
+      setRecentRecords(response.data);
+    } catch (error) {
+      console.error('Erro ao buscar registros:', error);
+      throw error;
+    }
+  };
+
+  const getAvailableActions = (currentLastRecordType) => {
+    if (!currentLastRecordType) {
+      return ['entry']; // Primeiro registro do dia - apenas entrada
     }
 
-    if (lastRecordType === null || lastRecordType === 'exit') {
-      // Nenhum registro hoje ou após uma saída
-      return ['entry'];
-    }
-
-    switch (lastRecordType) {
+    switch (currentLastRecordType) {
       case 'entry':
-        // Após Entrada/Retorno, só pode Pausar ou Sair
-        return ['pause', 'exit'];
+        return ['pause', 'exit']; // Após entrada: pode pausar ou sair
       case 'pause':
-        // Após Pausa, só pode Retornar (chamado de 'return' no frontend, que é 'entry' no backend)
-        return ['return'];
-      default:
-        return [];
-    }
-  }, [lastRecordType]);
-
-  const handleRegisterRecord = async (type) => {
-    let apiType = type;
-    let payload = {};
-
-    // Mapeia a ação de Retorno
-    if (type === 'return') {
-      apiType = 'entry'; // Envia 'entry' para o backend
-    }
-
-    // Se for pausa, abre o modal
-    if (type === 'pause') {
-      setShowPauseModal(true);
-      return;
-    }
-
-    setRegisterLoading(true);
-    closeAllModals();
-
-
-    try {
-      const response = await axios.post('/api/time-records', { type: apiType, ...payload });
-
-      const actionText = apiType === 'entry' ? (type === 'return' ? 'Retorno' : 'Entrada') : (apiType === 'exit' ? 'Saída' : response.data.type);
-
-      showSuccessMessage(
-        'Ponto Registrado!',
-        `Seu registro de ${actionText} foi efetuado com sucesso.`
-      );
-
-      // Atualiza os dados para recalcular o estado dos botões
-      await fetchAllData();
-
-    } catch (err) {
-      const serverError = err.response?.data?.error;
-      showErrorMessage('Erro ao Registrar Ponto', serverError || 'Ocorreu um erro ao tentar registrar o ponto.');
-    } finally {
-      setRegisterLoading(false);
-    }
-  };
-
-  const handlePauseSubmit = async () => {
-    if (!pauseForm.reason) {
-      showErrorMessage('Erro de Pausa', 'Motivo da pausa é obrigatório.');
-      return;
-    }
-
-    const pausePayload = {
-      type: 'pause',
-      pause_reason_id: pauseForm.reason,
-      custom_reason: pauseForm.reason === 'outro' ? pauseForm.description : null,
-    };
-
-    setRegisterLoading(true);
-    setShowPauseModal(false);
-
-
-    try {
-      await axios.post('/api/time-records', pausePayload);
-
-      showSuccessMessage(
-        'Pausa Registrada!',
-        `Seu registro de Pausa foi efetuado com sucesso por: ${pauseForm.reason === 'outro' ? pauseForm.description : pauseReasons.find(r => r._id === pauseForm.reason)?.name}.`
-      );
-
-      // Reseta e atualiza
-      setPauseForm({ reason: '', description: '' });
-      await fetchAllData();
-
-    } catch (err) {
-      const serverError = err.response?.data?.error;
-      showErrorMessage('Erro ao Registrar Pausa', serverError || 'Ocorreu um erro ao tentar registrar a pausa.');
-    } finally {
-      setRegisterLoading(false);
-    }
-  };
-
-  const handleAbsenceSubmit = async (e) => {
-    e.preventDefault();
-    if (!absenceForm.date || !absenceForm.reason) {
-      showErrorMessage('Erro', 'Data e Motivo são obrigatórios.');
-      return;
-    }
-    await submitRequest('absence', {
-      date: absenceForm.date,
-      reason: absenceForm.reason,
-      description: absenceForm.description,
-    });
-    setAbsenceForm({ date: '', reason: '', description: '' });
-  };
-
-  const handleTimeRecordSubmit = async (e) => {
-    e.preventDefault();
-    if (!timeRecordForm.date || !timeRecordForm.time || !timeRecordForm.reason) {
-      showErrorMessage('Erro', 'Data, Hora e Motivo são obrigatórios.');
-      return;
-    }
-    await submitRequest('time_record', {
-      date: timeRecordForm.date,
-      time: timeRecordForm.time,
-      reason: timeRecordForm.reason,
-      description: timeRecordForm.description,
-    });
-    setTimeRecordForm({ date: '', time: '', reason: '', description: '' });
-  };
-
-  const submitRequest = async (type, formData) => {
-    setRegisterLoading(true);
-    closeAllModals();
-    try {
-      await axios.post('/api/requests', { type, ...formData });
-      showSuccessMessage('Solicitação Enviada!', `Sua solicitação de ${type === 'absence' ? 'ausência' : 'ajuste de ponto'} foi enviada para aprovação.`);
-      await fetchMyRequests(); // Atualiza a lista de solicitações
-    } catch (err) {
-      const serverError = err.response?.data?.error;
-      showErrorMessage('Erro ao Enviar Solicitação', serverError || 'Ocorreu um erro ao enviar a solicitação.');
-    } finally {
-      setRegisterLoading(false);
-    }
-  };
-
-  const pendingRequestsCount = myRequests.filter(r => r.status === 'pending').length;
-
-  // Helper function to render action buttons (Usando classes do App.css: .btn-large)
-  const renderTimeActionButton = (action) => {
-    switch (action) {
-      case 'entry':
-        return (
-          <button key="entry" className="btn btn-primary btn-large" onClick={() => setLastRecord('entry')} disabled={registerLoading}>
-            <FiLogIn size={20} />
-            {registerLoading ? 'Registrando...' : 'Registrar Entrada'}
-          </button>
-        );
+        return ['entry']; // Após pausa: pode apenas RETORNAR (entrada)
       case 'exit':
-        return (
-          <button key="exit" className="btn btn-danger btn-large" onClick={() => setLastRecord('exit')} disabled={registerLoading}>
-            <FiLogOut size={20} />
-            {registerLoading ? 'Registrando...' : 'Registrar Saída'}
-          </button>
-        );
-      case 'pause':
-        return (
-          <button key="pause" className="btn btn-warning btn-large" onClick={() => setLastRecord('pause')} disabled={registerLoading}>
-            <FiPauseCircle size={20} />
-            {registerLoading ? 'Registrando...' : 'Registrar Pausa'}
-          </button>
-        );
-      case 'return':
-        return (
-          <button key="return" className="btn btn-success btn-large" onClick={() => setLastRecord('return')} disabled={registerLoading}>
-            <FiCheckCircle size={20} />
-            {registerLoading ? 'Registrando...' : 'Registrar Retorno'}
-          </button>
-        );
+        return ['entry']; // Após saída: pode iniciar novo turno (entrada)
       default:
-        return null;
+        return ['entry'];
     }
   };
 
-  // Helper function to display record type badge (Usando classes do App.css: .record-type)
-  const getRecordBadge = (type) => {
-    const typeConfig = {
-      entry: { class: 'entry', text: 'Entrada/Retorno', icon: <FiLogIn size={14} /> },
-      exit: { class: 'exit', text: 'Saída', icon: <FiLogOut size={14} /> },
-      pause: { class: 'pause', text: 'Pausa', icon: <FiPauseCircle size={14} /> },
+  // ATUALIZADA: Registrar ponto com modais de confirmação
+  const registerTime = async (type, pauseReason = null) => {
+    setRegisterLoading(true);
+    setError('');
+
+    try {
+      let response;
+
+      if (type === 'pause' && pauseReason) {
+        response = await axios.post('/api/me/time-records-with-reason', {
+          type,
+          pause_reason_id: pauseReason.reason === 'outro' ? null : pauseReason.reason,
+          custom_reason: pauseReason.description
+        });
+      } else {
+        response = await axios.post('/api/me/time-records', { type });
+      }
+
+      // Recarregar TODOS os dados do servidor
+      await fetchAllData();
+
+      setLastRecord({
+        type,
+        timestamp: new Date().toLocaleString('pt-BR'),
+        employee: employeeData?.name
+      });
+
+      // Fechar modal de pausa se aplicável
+      if (type === 'pause') {
+        setShowPauseModal(false);
+        setPauseForm({ reason: '', description: '' });
+      }
+
+      // MOSTRAR MODAL DE SUCESSO
+      const actionNames = {
+        'entry': 'Entrada',
+        'pause': 'Pausa',
+        'exit': 'Saída'
+      };
+
+      showSuccessMessage(
+        'Registro Confirmado',
+        `${actionNames[type]} registrada com sucesso às ${new Date().toLocaleTimeString('pt-BR')}`
+      );
+
+    } catch (error) {
+      console.error('Erro ao registrar ponto:', error);
+
+      // Recarregar dados mesmo em caso de erro
+      await fetchTodayRecords();
+
+      const errorMessage = error.response?.data?.error || 'Erro ao registrar ponto';
+
+      // MOSTRAR MODAL DE ERRO
+      showErrorMessage('Erro no Registro', errorMessage);
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
+  // ATUALIZADA: Enviar solicitação com modais
+  const submitRequest = async (type, formData) => {
+    try {
+      setError('');
+
+      const requestData = {
+        type,
+        date: formData.date,
+        reason: formData.reason,
+        description: formData.description || '',
+        requested_time: type === 'time_record' ? formData.time : null
+      };
+
+      await axios.post('/api/requests', requestData);
+
+      // Fechar modal e limpar formulário
+      if (type === 'absence') {
+        setShowAbsenceModal(false);
+        setAbsenceForm({ date: '', reason: '', description: '' });
+      } else {
+        setShowTimeRecordModal(false);
+        setTimeRecordForm({ date: '', time: '', reason: '', description: '' });
+      }
+
+      // Recarregar dados atualizados
+      await fetchMyRequests();
+
+      // MOSTRAR MODAL DE SUCESSO
+      const requestTypeNames = {
+        'absence': 'Ausência',
+        'time_record': 'Registro de Ponto'
+      };
+
+      showSuccessMessage(
+        'Solicitação Enviada',
+        `Sua solicitação de ${requestTypeNames[type]} foi enviada com sucesso! Aguarde a aprovação do administrador.`
+      );
+
+    } catch (error) {
+      console.error('Erro ao enviar solicitação:', error);
+      showErrorMessage('Erro na Solicitação', error.response?.data?.error || 'Erro ao enviar solicitação');
+    }
+  };
+
+  // ... (restante das funções getStatusBadge, getTypeBadge permanecem iguais)
+
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      pending: { class: 'warning', text: 'Pendente', icon: <FiClock size={14} /> },
+      approved: { class: 'success', text: 'Aprovada', icon: <FiCheck size={14} /> },
+      rejected: { class: 'danger', text: 'Rejeitada', icon: <FiX size={14} /> }
     };
 
-    const config = typeConfig[type] || { class: 'secondary', text: 'Ponto', icon: <FiClock size={14} /> };
-
+    const config = statusConfig[status] || statusConfig.pending;
     return (
-      <span className={`record-type ${config.class}`}>
+      <span className={`badge badge-${config.class}`}>
         {config.icon}
-        {config.text}
+        <span style={{ marginLeft: '4px' }}>{config.text}</span>
       </span>
     );
   };
 
-  // Helper function to display request type/status badges (Usando classes do App.css: .badge)
-  const renderRequestBadges = (type, status) => {
-    let config = { type: type, text: 'Solicitação', icon: <FiFileText size={14} /> };
+  const getTypeBadge = (type) => {
+    const typeConfig = {
+      absence: { class: 'info', text: 'Ausência', icon: <FiCalendar size={14} /> },
+      time_record: { class: 'primary', text: 'Registro de Ponto', icon: <FiWatch size={14} /> }
+    };
 
-    switch (type) {
-      case 'absence':
-        config = { class: 'info', text: 'Ausência', icon: <FiCalendar size={14} /> };
-        break;
-      case 'time_record':
-        config = { class: 'primary', text: 'Ajuste de Ponto', icon: <FiClock size={14} /> };
-        break;
-      default:
-        config = { class: 'secondary', text: 'Outros', icon: <FiInfo size={14} /> };
-    }
-
-    let statusConfig = {};
-    switch (status) {
-      case 'pending':
-        statusConfig = { class: 'warning', text: 'Pendente', icon: <FiAlertCircle size={14} /> };
-        break;
-      case 'approved':
-        statusConfig = { class: 'success', text: 'Aprovada', icon: <FiCheckCircle size={14} /> };
-        break;
-      case 'rejected':
-        statusConfig = { class: 'danger', text: 'Rejeitada', icon: <FiX size={14} /> };
-        break;
-      default:
-        statusConfig = { class: 'secondary', text: 'Status Desconhecido', icon: <FiInfo size={14} /> };
-    }
-
+    const config = typeConfig[type] || typeConfig.absence;
     return (
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <span className={`badge badge-${config.class}`}>
-          {config.icon}
-          <span style={{ marginLeft: '4px' }}>{config.text}</span>
-        </span>
-        <span className={`badge badge-${statusConfig.class}`}>
-          {statusConfig.icon}
-          <span style={{ marginLeft: '4px' }}>{statusConfig.text}</span>
-        </span>
-      </div>
+      <span className={`badge badge-${config.class}`}>
+        {config.icon}
+        <span style={{ marginLeft: '4px' }}>{config.text}</span>
+      </span>
     );
   };
 
-  if (loading || lastRecordType === undefined) {
+  const availableActions = getAvailableActions(lastRecordType);
+  const pendingRequestsCount = myRequests.filter(req => req.status === 'pending').length;
+
+  if (loading) {
     return (
-      <div className="loading-page">
-        <div className="empty-content">
-          <FiClock size={60} className="loading-spinner" style={{ width: '60px', height: '60px', border: '6px solid #007bff', borderTopColor: 'transparent', margin: '0' }} />
-          <h3>Carregando Dashboard...</h3>
-          <p>Aguarde enquanto buscamos seus dados.</p>
-        </div>
+      <div className="loading-container">
+        <div className="loading">Carregando seus dados...</div>
       </div>
     );
   }
 
   return (
     <div className="container">
+      <div className="header">
+        <div className="header-title">
+          <FiHome className="header-icon" size={32} />
+          <div>
+            <h1>Meu Painel</h1>
+            <p className="text-muted">Controle seus registros de ponto</p>
+          </div>
+        </div>
+      </div>
+
+      {/* REMOVIDO: Mensagem de erro no topo - agora usamos modais */}
+
       {employeeData ? (
         <>
-          {/* Cabeçalho Principal */}
-          <div className="header">
-            <div className="header-title">
-              <FiHome className="header-icon" size={32} />
-              <div>
-                <h1>Dashboard do Funcionário</h1>
-                <p className="text-muted">Bem-vindo(a), {employeeData?.name || user.email}.</p>
+          {/* Grid de Estatísticas (mantido igual) */}
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-icon">
+                <FiUser size={24} />
               </div>
-            </div>
-            {/* Relógio Atual como um badge */}
-            <div className="badge badge-secondary">
-              <FiClock size={16} />
-              <span>{currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-            </div>
-          </div>
-
-          {/* Seção de Controle de Ponto e Ações Rápidas */}
-          <div className="time-clock-container">
-            {/* Card de Controle de Ponto */}
-            <div className="time-clock-card">
-              <div className="section-header">
-                <FiWatch size={24} />
-                <h3>Registro de Ponto</h3>
-              </div>
-
-              {/* Display de Hora Atual */}
-              <div className="current-time">
-                <div className="time-display">{currentTime.toLocaleTimeString('pt-BR')}</div>
-                <div className="date-display">{currentTime.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
-              </div>
-
-              {/* Botões de Ação */}
-              <div className="time-buttons">
-                {registerLoading ? (
-                  <button className="btn btn-secondary btn-large" disabled>
-                    <span className="loading-spinner" style={{ width: '20px', height: '20px', border: '2px solid white', borderTopColor: 'transparent' }}></span>
-                    Carregando Ações
-                  </button>
-                ) : (
-                  availableActions.length > 0 ? (
-                    availableActions.map(action => renderTimeActionButton(action))
-                  ) : (
-                    <div className="info-card error-card" style={{ gridColumn: '1 / -1', margin: '0', padding: '15px 20px' }}>
-                      <p className="text-muted" style={{ margin: '0', fontStyle: 'normal' }}>
-                        <FiCheckCircle size={16} style={{ color: '#28a745', marginRight: '5px' }} />
-                        Seu dia parece completo.
-                      </p>
-                    </div>
-                  )
-                )}
-              </div>
-
-              {/* Último Registro */}
-              <div className="last-record-card">
-                <p className="text-muted" style={{ margin: '0' }}>
-                  <FiInfo size={16} style={{ marginRight: '5px' }} />
-                  Último registro de ponto: {lastRecord ? (
-                    <>
-                      {getRecordBadge(lastRecord.type)} às **{formatTime(lastRecord.timestamp)}**
-                      {lastRecord.reason && <span className="text-muted" style={{ marginLeft: '10px' }}>(Motivo: {lastRecord.reason})</span>}
-                    </>
-                  ) : 'Nenhum registro hoje.'}
-                </p>
-              </div>
+              <h3>Funcionário</h3>
+              <div className="stat-number">{employeeData.name.split(' ')[0]}</div>
+              <p>Seu perfil ativo</p>
             </div>
 
-            {/* Card de Ações Rápidas */}
-            <div className="quick-actions-card">
-              <div className="section-header">
-                <FiArrowRight size={24} />
-                <h3>Ações Rápidas</h3>
+            <div className="stat-card">
+              <div className="stat-icon">
+                <FiBriefcase size={24} />
               </div>
-              <div className="action-buttons">
-                <button className="btn btn-warning" onClick={() => setShowTimeRecordModal(true)}>
-                  <FiClock size={18} /><span>Ajustar Ponto Manualmente</span>
-                </button>
-                <button className="btn btn-warning" onClick={() => setShowAbsenceModal(true)}>
-                  <FiCalendar size={18} /><span>Solicitar Ausência/Férias</span>
-                </button>
-                <button className="btn btn-secondary" onClick={() => setShowRequestsModal(true)}>
-                  <FiFileText size={18} />
-                  <span>Ver Minhas Solicitações</span>
-                  {pendingRequestsCount > 0 && (
-                    <span className="badge badge-danger" style={{ marginLeft: '8px' }}>{pendingRequestsCount}</span>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-
-
-          {/* Grid de Informações e Registros */}
-          <div className="reports-grid" style={{ marginTop: '25px' }}>
-
-            {/* Estatísticas Chave */}
-            <div className="card">
-              <div className="section-header">
-                <FiTrendingUp size={24} />
-                <h3>Estatísticas Chave</h3>
-              </div>
-              <div className="config-body">
-                <div className="employee-info">
-                  <FiBriefcase size={20} /> <span>Departamento: <strong>{employeeData.department}</strong></span>
-                </div>
-                <div className="employee-info">
-                  <FiCalendar size={20} /> <span>Contratação: <strong>{new Date(employeeData.hire_date).toLocaleDateString('pt-BR')}</strong></span>
-                </div>
-                <div className="employee-info" style={{ borderLeft: employeeData.current_time_bank > 0 ? '4px solid #28a745' : '4px solid #dc3545', paddingLeft: '10px', background: '#f8f9fa', borderRadius: '4px' }}>
-                  <FiClock size={20} /> <span>Banco de Horas: <strong>{employeeData.current_time_bank !== undefined ? (employeeData.current_time_bank >= 0 ? '+' : '-') + Math.floor(Math.abs(employeeData.current_time_bank) / 60) + 'h ' + (Math.abs(employeeData.current_time_bank) % 60) + 'm' : 'N/A'}</strong></span>
-                </div>
-              </div>
+              <h3>Departamento</h3>
+              <div className="stat-number">{employeeData.department}</div>
+              <p>Área de atuação</p>
             </div>
 
-            {/* Registros de Hoje */}
-            <div className="card">
-              <div className="section-header">
+            <div className="stat-card">
+              <div className="stat-icon">
+                <FiClock size={24} />
+              </div>
+              <h3>Registros Hoje</h3>
+              <div className="stat-number">{todayRecordsList.length}</div>
+              <p>Pontos registrados hoje</p>
+            </div>
+
+            <div
+              className="stat-card clickable"
+              onClick={() => setShowRequestsModal(true)}
+              style={{ cursor: 'pointer' }}
+            >
+              <div className="stat-icon">
                 <FiFileText size={24} />
-                <h3>Registros de Hoje</h3>
               </div>
-              <div className="config-body">
-                {todayRecordsList.length > 0 ? (
-                  todayRecordsList.map((record, index) => (
-                    <div key={index} className="employee-info-summary" style={{ borderLeftColor: record.type === 'exit' ? '#dc3545' : record.type === 'pause' ? '#ffc107' : '#007bff' }}>
-                      {getRecordBadge(record.type)}
-                      <span>**{formatTime(record.timestamp)}**
-                        {record.reason && <span className="text-muted" style={{ marginLeft: '10px' }}>({record.reason})</span>}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="empty-content" style={{ padding: '0' }}>
-                    <FiInfo size={30} style={{ color: '#dee2e6' }} />
-                    <p>Nenhum registro encontrado para hoje.</p>
-                  </div>
+              <h3>Solicitações</h3>
+              <div className="stat-number">{pendingRequestsCount}</div>
+              <p>Pendentes de aprovação</p>
+            </div>
+          </div>
+
+          {/* Time Clock (mantido igual) */}
+          <div className="time-clock-container">
+            <div className="time-clock-card">
+              <div className="work-status">
+                <div className={`status-indicator ${lastRecordType || 'waiting'}`}>
+                  <strong>Status Atual: </strong>
+                  {!lastRecordType && '🟡 Aguardando entrada'}
+                  {lastRecordType === 'entry' && '🟢 Em trabalho'}
+                  {lastRecordType === 'pause' && '🟠 Em pausa'}
+                  {lastRecordType === 'exit' && '🔴 Expediente encerrado'}
+                </div>
+              </div>
+              <div className="current-time">
+                <div className="date-display">
+                  {currentTime.toLocaleDateString('pt-BR', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </div>
+                <div className="time-display">
+                  {currentTime.toLocaleTimeString('pt-BR')}
+                </div>
+              </div>
+
+              <div className="time-buttons">
+                {availableActions.includes('entry') && (
+                  <button
+                    className="btn btn-success btn-large"
+                    onClick={() => registerTime('entry')}
+                    disabled={registerLoading}
+                  >
+                    {registerLoading ? (
+                      <>
+                        <div className="loading-spinner"></div>
+                        <span>Registrando...</span>
+                      </>
+                    ) : lastRecordType === 'pause' ? (
+                      <>
+                        <FiLogIn size={20} />
+                        <span>Retornar do Almoço</span>
+                      </>
+                    ) : lastRecordType === 'exit' ? (
+                      <>
+                        <FiLogIn size={20} />
+                        <span>Novo Turno</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiLogIn size={20} />
+                        <span>Registrar Entrada</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {availableActions.includes('pause') && (
+                  <button
+                    className="btn btn-warning btn-large"
+                    onClick={() => setShowPauseModal(true)}
+                    disabled={registerLoading}
+                  >
+                    <FiPauseCircle size={20} />
+                    <span>Registrar Pausa</span>
+                  </button>
+                )}
+
+                {availableActions.includes('exit') && (
+                  <button
+                    className="btn btn-danger btn-large"
+                    onClick={() => registerTime('exit')}
+                    disabled={registerLoading}
+                  >
+                    <FiLogOut size={20} />
+                    <span>Registrar Saída</span>
+                  </button>
                 )}
               </div>
+
+              <div className="request-buttons" style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
+                <h4 style={{ marginBottom: '15px', color: '#555' }}>Solicitações</h4>
+
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <button
+                    className="btn btn-info"
+                    onClick={() => setShowAbsenceModal(true)}
+                  >
+                    <FiCalendar size={16} />
+                    <span>Justificar Ausência</span>
+                  </button>
+
+                  <button
+                    className="btn btn-warning"
+                    onClick={() => setShowTimeRecordModal(true)}
+                  >
+                    <FiWatch size={16} />
+                    <span>Solicitar Ponto</span>
+                  </button>
+
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setShowRequestsModal(true)}
+                  >
+                    <FiEye size={16} />
+                    <span>Ver Minhas Solicitações</span>
+                    {pendingRequestsCount > 0 && (
+                      <span className="badge badge-danger" style={{ marginLeft: '8px' }}>
+                        {pendingRequestsCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {lastRecord && (
+                <div className="last-record-card">
+                  <div className="section-header">
+                    <FiCheckCircle size={20} />
+                    <h4>Último Registro Confirmado</h4>
+                  </div>
+                  <div className="record-details">
+                    <div className="record-item">
+                      <div>
+                        <strong>Tipo</strong>
+                        <span className={`record-type ${lastRecord.type}`}>
+                          {lastRecord.type === 'entry' ? 'Entrada' :
+                            lastRecord.type === 'pause' ? 'Pausa' : 'Saída'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="record-item">
+                      <div>
+                        <strong>Horário</strong>
+                        <span>{lastRecord.timestamp}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {todayRecordsList.length > 0 && (
+                <div className="today-records-card">
+                  <div className="section-header">
+                    <FiClock size={16} />
+                    <h5>Seus Registros de Hoje</h5>
+                  </div>
+                  <div className="today-records-list">
+                    {todayRecordsList.map(record => (
+                      <div key={record._id} className="today-record-item">
+                        <span className={`record-badge ${record.type}`}>
+                          {record.type === 'entry' ? '→' :
+                            record.type === 'pause' ? '⏸' : '←'}
+                        </span>
+                        <span>{new Date(record.timestamp).toLocaleTimeString('pt-BR')}</span>
+                        <span className={`record-type-small ${record.type}`}>
+                          {record.type === 'entry' ? 'Entrada' :
+                            record.type === 'pause' ? 'Pausa' : 'Saída'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Minhas Solicitações (Card) */}
-            <div className="card" style={{ gridColumn: '1 / -1' }}>
-              <div className="table-header">
-                <h3>Minhas Solicitações</h3>
-                <button className="btn btn-secondary btn-small" onClick={() => setShowRequestsModal(true)}>
-                  <FiEye size={16} /> Ver Todas
-                  {pendingRequestsCount > 0 && <span className="badge badge-danger" style={{ marginLeft: '8px' }}>{pendingRequestsCount}</span>}
-                </button>
+            <div className="stats-sidebar">
+              <div className="stat-card">
+                <div className="stat-icon">
+                  <FiTrendingUp size={20} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-number">{todayRecordsList.length}</div>
+                  <div className="stat-label">Registros Hoje</div>
+                </div>
               </div>
-              <div className="table-container" style={{ boxShadow: 'none', margin: '0' }}>
-                {myRequests.length > 0 ? (
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Tipo / Status</th>
-                        <th>Detalhes</th>
-                        <th>Data da Solicitação</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {myRequests.slice(0, 5).map((request, index) => (
-                        <tr key={index}>
-                          <td>{renderRequestBadges(request.type, request.status)}</td>
-                          <td>
-                            {request.type === 'absence' ? `Data: ${new Date(request.date).toLocaleDateString('pt-BR')}` : `Ponto: ${new Date(request.date).toLocaleDateString('pt-BR')} ${request.time}`}
-                            <br />
-                            <span className="text-muted">Motivo: {request.reason}</span>
-                          </td>
-                          <td>{new Date(request.createdAt).toLocaleDateString('pt-BR')}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="empty-content" style={{ padding: '40px 20px 0' }}>
-                    <FiFileText size={30} style={{ color: '#dee2e6' }} />
-                    <p>Você não possui solicitações recentes.</p>
-                  </div>
-                )}
+
+              <div className="stat-card">
+                <div className="stat-icon">
+                  <FiCalendar size={20} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-number">{recentRecords.length}</div>
+                  <div className="stat-label">Registros Este Mês</div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* MODAIS */}
+          {/* NOVO: Modal de Sucesso */}
+          {showSuccessModal && (
+            <div className="modal-overlay">
+              <div className="modal success-modal">
+                <div className="modal-header success-header">
+                  <FiCheckCircle size={24} className="success-icon" />
+                  <h3>{modalContent.title}</h3>
+                  <button
+                    className="btn-close-modal"
+                    onClick={closeModals}
+                  >
+                    <FiX size={20} />
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="success-content">
+                    <p>{modalContent.message}</p>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button
+                    className="btn btn-success"
+                    onClick={closeModals}
+                  >
+                    <FiCheck size={16} />
+                    <span>OK</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
-          {/* Modal de Pausa */}
+          {/* NOVO: Modal de Erro */}
+          {showErrorModal && (
+            <div className="modal-overlay">
+              <div className="modal error-modal">
+                <div className="modal-header error-header">
+                  <FiAlertCircle size={24} className="error-icon" />
+                  <h3>{modalContent.title}</h3>
+                  <button
+                    className="btn-close-modal"
+                    onClick={closeModals}
+                  >
+                    <FiX size={20} />
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="error-content">
+                    <p>{modalContent.message}</p>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button
+                    className="btn btn-danger"
+                    onClick={closeModals}
+                  >
+                    <FiX size={16} />
+                    <span>Fechar</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal de Pausa (mantido igual) */}
           {showPauseModal && (
             <div className="modal-overlay">
-              <div className="modal-content">
+              <div className="modal">
                 <div className="modal-header">
-                  <h3><FiPauseCircle size={20} /> Registrar Pausa</h3>
-                  <button type="button" className="btn-close-modal" onClick={() => setShowPauseModal(false)}><FiX size={24} /></button>
+                  <h3>Registrar Pausa</h3>
+                  <button
+                    className="btn-close-modal"
+                    onClick={() => setShowPauseModal(false)}
+                  >
+                    <FiX size={20} />
+                  </button>
                 </div>
                 <div className="modal-body">
                   <div className="form-group">
                     <label>Motivo da Pausa *</label>
                     <select
                       value={pauseForm.reason}
-                      onChange={(e) => setPauseForm({ ...pauseForm, reason: e.target.value, description: e.target.value === 'outro' ? pauseForm.description : '' })}
+                      onChange={(e) => setPauseForm({ ...pauseForm, reason: e.target.value })}
                       required
                     >
                       <option value="">Selecione um motivo</option>
@@ -627,152 +719,137 @@ const EmployeeDashboard = () => {
                       <option value="outro">Outro (especifique abaixo)</option>
                     </select>
                   </div>
-                  {(pauseForm.reason === 'outro') && (
+
+                  {pauseForm.reason === 'outro' && (
                     <div className="form-group">
-                      <label>Descrição *</label>
+                      <label>Descrição do Motivo *</label>
                       <input
                         type="text"
                         value={pauseForm.description}
                         onChange={(e) => setPauseForm({ ...pauseForm, description: e.target.value })}
+                        placeholder="Descreva o motivo da pausa..."
                         required
-                        placeholder="Descreva o motivo da pausa"
                       />
                     </div>
                   )}
-                  <div className="modal-footer" style={{ borderTop: 'none', background: 'white', padding: '0' }}>
-                    <button className="btn btn-secondary" onClick={() => setShowPauseModal(false)}>Cancelar</button>
-                    <button
-                      className="btn btn-primary"
-                      disabled={!pauseForm.reason || (pauseForm.reason === 'outro' && !pauseForm.description) || registerLoading}
-                      onClick={handlePauseSubmit}
-                    >
-                      <FiSave size={16} /> {registerLoading ? 'Registrando...' : 'Confirmar Pausa'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* Modal de Solicitações (Ver Todas) */}
-          {showRequestsModal && (
-            <div className="modal-overlay">
-              <div className="modal-content large">
-                <div className="modal-header">
-                  <h3><FiEye size={20} /> Minhas Solicitações</h3>
-                  <button type="button" className="btn-close-modal" onClick={() => setShowRequestsModal(false)}><FiX size={24} /></button>
-                </div>
-                <div className="modal-body">
-                  {myRequests.length === 0 ? (
-                    <div className="empty-content">
-                      <FiFileText size={40} style={{ color: '#dee2e6' }} />
-                      <p className="text-muted" style={{ fontStyle: 'normal' }}>Você não possui solicitações registradas.</p>
-                    </div>
-                  ) : (
-                    <div className="table-container" style={{ boxShadow: 'none', margin: '0' }}>
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>Tipo / Status</th>
-                            <th>Detalhes</th>
-                            <th>Data da Solicitação</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {myRequests.map((request, index) => (
-                            <tr key={index}>
-                              <td>{renderRequestBadges(request.type, request.status)}</td>
-                              <td>
-                                {request.type === 'absence'
-                                  ? `Data: ${new Date(request.date).toLocaleDateString('pt-BR')}`
-                                  : `Ponto: ${new Date(request.date).toLocaleDateString('pt-BR')} ${request.time}`}
-                                <br />
-                                <span className="text-muted">Motivo: {request.reason}</span>
-                                {request.description && <p className="text-muted" style={{ margin: '5px 0 0 0' }}>* {request.description}</p>}
-                              </td>
-                              <td>{new Date(request.createdAt).toLocaleDateString('pt-BR')}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  {pauseForm.reason !== 'outro' && pauseForm.reason !== '' && (
+                    <div className="form-group">
+                      <label>Observações Adicionais</label>
+                      <textarea
+                        value={pauseForm.description}
+                        onChange={(e) => setPauseForm({ ...pauseForm, description: e.target.value })}
+                        placeholder="Observações adicionais sobre a pausa..."
+                        rows="3"
+                      />
                     </div>
                   )}
                 </div>
                 <div className="modal-footer">
-                  <button className="btn btn-secondary" onClick={() => setShowRequestsModal(false)}>Fechar</button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setShowPauseModal(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => registerTime('pause', pauseForm)}
+                    disabled={!pauseForm.reason || registerLoading}
+                  >
+                    {registerLoading ? (
+                      <>
+                        <div className="loading-spinner"></div>
+                        <span>Registrando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiPauseCircle size={16} />
+                        <span>Registrar Pausa</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Modal de Solicitação de Ausência */}
+          {/* Modal de Solicitação de Ausência (mantido igual) */}
           {showAbsenceModal && (
             <div className="modal-overlay">
-              <div className="modal-content">
+              <div className="modal">
                 <div className="modal-header">
-                  <h3><FiCalendar size={20} /> Solicitar Ausência</h3>
-                  <button type="button" className="btn-close-modal" onClick={() => setShowAbsenceModal(false)}><FiX size={24} /></button>
+                  <h3>Solicitar Ausência</h3>
+                  <button className="btn-close-modal" onClick={() => setShowAbsenceModal(false)}>
+                    <FiX size={20} />
+                  </button>
                 </div>
-                <form onSubmit={handleAbsenceSubmit}>
-                  <div className="modal-body">
-                    <p className="text-muted" style={{ marginBottom: '20px' }}>Use este formulário para solicitar dias de ausência ou férias.</p>
-                    <div className="form-group">
-                      <label>Data de Ausência *</label>
-                      <input
-                        type="date"
-                        value={absenceForm.date}
-                        onChange={(e) => setAbsenceForm({ ...absenceForm, date: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Motivo *</label>
-                      <select
-                        value={absenceForm.reason}
-                        onChange={(e) => setAbsenceForm({ ...absenceForm, reason: e.target.value })}
-                        required
-                      >
-                        <option value="">Selecione o motivo</option>
-                        <option value="ferias">Férias</option>
-                        <option value="licenca-medica">Licença Médica</option>
-                        <option value="assuntos-pessoais">Assuntos Pessoais</option>
-                        <option value="outro">Outro</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Detalhes/Descrição</label>
-                      <textarea
-                        value={absenceForm.description}
-                        onChange={(e) => setAbsenceForm({ ...absenceForm, description: e.target.value })}
-                        rows="3"
-                        style={{ height: 'auto', minHeight: '100px' }}
-                      ></textarea>
-                    </div>
+                <div className="modal-body">
+                  <div className="form-group">
+                    <label>Data da Ausência *</label>
+                    <input
+                      type="date"
+                      value={absenceForm.date}
+                      onChange={(e) => setAbsenceForm({ ...absenceForm, date: e.target.value })}
+                      required
+                    />
                   </div>
-                  <div className="modal-footer">
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowAbsenceModal(false)}>Cancelar</button>
-                    <button type="submit" className="btn btn-primary" disabled={registerLoading}>
-                      <FiSave size={16} /> {registerLoading ? 'Enviando...' : 'Enviar Solicitação'}
-                    </button>
+                  <div className="form-group">
+                    <label>Motivo da Ausência *</label>
+                    <select
+                      value={absenceForm.reason}
+                      onChange={(e) => setAbsenceForm({ ...absenceForm, reason: e.target.value })}
+                      required
+                    >
+                      <option value="">Selecione um motivo</option>
+                      {pauseReasons.map(reason => (
+                        <option key={reason._id} value={reason.name}>
+                          {reason.name} {reason.description && `- ${reason.description}`}
+                        </option>
+                      ))}
+                      <option value="Outro">Outro (especifique na descrição)</option>
+                    </select>
                   </div>
-                </form>
+                  <div className="form-group">
+                    <label>Descrição Detalhada</label>
+                    <textarea
+                      value={absenceForm.description}
+                      onChange={(e) => setAbsenceForm({ ...absenceForm, description: e.target.value })}
+                      placeholder="Forneça mais detalhes sobre sua ausência..."
+                      rows="4"
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setShowAbsenceModal(false)}>
+                    Cancelar
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => submitRequest('absence', absenceForm)}
+                    disabled={!absenceForm.date || !absenceForm.reason}
+                  >
+                    Enviar Solicitação
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Modal de Ajuste de Ponto Manual */}
+          {/* Modal de Solicitação de Registro de Ponto (mantido igual) */}
           {showTimeRecordModal && (
             <div className="modal-overlay">
-              <div className="modal-content">
+              <div className="modal">
                 <div className="modal-header">
-                  <h3><FiClock size={20} /> Ajuste de Ponto</h3>
-                  <button type="button" className="btn-close-modal" onClick={() => setShowTimeRecordModal(false)}><FiX size={24} /></button>
+                  <h3>Solicitar Registro de Ponto</h3>
+                  <button className="btn-close-modal" onClick={() => setShowTimeRecordModal(false)}>
+                    <FiX size={20} />
+                  </button>
                 </div>
-                <form onSubmit={handleTimeRecordSubmit}>
-                  <div className="modal-body">
-                    <p className="text-muted" style={{ marginBottom: '20px' }}>Preencha o formulário para solicitar o registro de um ponto que você esqueceu de bater.</p>
+                <div className="modal-body">
+                  <div className="form-row">
                     <div className="form-group">
-                      <label>Data do Ponto *</label>
+                      <label>Data *</label>
                       <input
                         type="date"
                         value={timeRecordForm.date}
@@ -781,7 +858,7 @@ const EmployeeDashboard = () => {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Hora do Ponto *</label>
+                      <label>Horário *</label>
                       <input
                         type="time"
                         value={timeRecordForm.time}
@@ -789,76 +866,207 @@ const EmployeeDashboard = () => {
                         required
                       />
                     </div>
-                    <div className="form-group">
-                      <label>Motivo *</label>
-                      <select
-                        value={timeRecordForm.reason}
-                        onChange={(e) => setTimeRecordForm({ ...timeRecordForm, reason: e.target.value })}
-                        required
-                      >
-                        <option value="">Selecione o motivo</option>
-                        <option value="esquecimento">Esquecimento</option>
-                        <option value="falha-equipamento">Falha de Equipamento</option>
-                        <option value="trabalho-externo">Trabalho Externo</option>
-                        <option value="outro">Outro</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Detalhes/Descrição</label>
-                      <textarea
-                        value={timeRecordForm.description}
-                        onChange={(e) => setTimeRecordForm({ ...timeRecordForm, description: e.target.value })}
-                        rows="3"
-                        style={{ height: 'auto', minHeight: '100px' }}
-                      ></textarea>
-                    </div>
                   </div>
-                  <div className="modal-footer">
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowTimeRecordModal(false)}>Cancelar</button>
-                    <button type="submit" className="btn btn-primary" disabled={registerLoading}>
-                      <FiSave size={16} /> {registerLoading ? 'Enviando...' : 'Enviar Solicitação'}
-                    </button>
+                  <div className="form-group">
+                    <label>Motivo do Esquecimento *</label>
+                    <select
+                      value={timeRecordForm.reason}
+                      onChange={(e) => setTimeRecordForm({ ...timeRecordForm, reason: e.target.value })}
+                      required
+                    >
+                      <option value="">Selecione um motivo</option>
+                      {pauseReasons.map(reason => (
+                        <option key={reason._id} value={reason.name}>
+                          {reason.name} {reason.description && `- ${reason.description}`}
+                        </option>
+                      ))}
+                      <option value="Outro">Outro (especifique na descrição)</option>
+                    </select>
                   </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* Modal de Sucesso */}
-          {showSuccessModal && (
-            <div className="modal-overlay success-modal">
-              <div className="modal-content">
-                <div className="success-content">
-                  <FiCheckCircle size={60} className="success-icon" />
-                  <h3>{modalContent.title}</h3>
-                  <p>{modalContent.message}</p>
+                  <div className="form-group">
+                    <label>Descrição Detalhada</label>
+                    <textarea
+                      value={timeRecordForm.description}
+                      onChange={(e) => setTimeRecordForm({ ...timeRecordForm, description: e.target.value })}
+                      placeholder="Forneça mais detalhes sobre o ocorrido..."
+                      rows="4"
+                    />
+                  </div>
                 </div>
-                <div className="modal-footer" style={{ borderTop: 'none', background: 'white' }}>
-                  <button className="btn btn-success" onClick={closeAllModals}>
-                    <FiCheck size={16} /> Fechar
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setShowTimeRecordModal(false)}>
+                    Cancelar
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => submitRequest('time_record', timeRecordForm)}
+                    disabled={!timeRecordForm.date || !timeRecordForm.time || !timeRecordForm.reason}
+                  >
+                    Enviar Solicitação
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Modal de Erro */}
-          {showErrorModal && (
-            <div className="modal-overlay error-modal">
-              <div className="modal-content">
-                <div className="error-content">
-                  <FiAlertCircle size={60} className="error-icon" />
-                  <h3>{modalContent.title}</h3>
-                  <p>{modalContent.message}</p>
+          {/* Modal de Visualização de Solicitações (mantido igual) */}
+          {showRequestsModal && (
+            <div className="modal-overlay">
+              <div className="modal large">
+                <div className="modal-header">
+                  <h3>Minhas Solicitações</h3>
+                  <button
+                    className="btn-close-modal"
+                    onClick={() => setShowRequestsModal(false)}
+                  >
+                    <FiX size={20} />
+                  </button>
                 </div>
-                <div className="modal-footer" style={{ borderTop: 'none', background: 'white' }}>
-                  <button className="btn btn-danger" onClick={closeAllModals}>
-                    <FiX size={16} /> Fechar
+                <div className="modal-body">
+                  {myRequests.length === 0 ? (
+                    <div className="empty-state">
+                      <FiFileText size={48} />
+                      <h4>Nenhuma solicitação encontrada</h4>
+                      <p>Você ainda não fez nenhuma solicitação.</p>
+                    </div>
+                  ) : (
+                    <div className="requests-list">
+                      {myRequests.map(request => (
+                        <div key={request._id} className="request-item">
+                          <div className="request-header">
+                            <div className="request-type">
+                              {getTypeBadge(request.type)}
+                              {getStatusBadge(request.status)}
+                            </div>
+                            <div className="request-date">
+                              {new Date(request.date).toLocaleDateString('pt-BR')}
+                              {request.requested_time && (
+                                <span> às {new Date(request.requested_time).toLocaleTimeString('pt-BR')}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="request-details">
+                            <div className="detail">
+                              <strong>Motivo:</strong> {request.reason}
+                            </div>
+                            {request.description && (
+                              <div className="detail">
+                                <strong>Descrição:</strong>
+                                <div className="description-content">
+                                  {request.description}
+                                </div>
+                              </div>
+                            )}
+                            {request.admin_notes && (
+                              <div className="detail admin-notes">
+                                <strong>Observações do Admin:</strong>
+                                <div className="description-content">
+                                  {request.admin_notes}
+                                </div>
+                              </div>
+                            )}
+                            {request.processed_at && (
+                              <div className="detail">
+                                <strong>Processado em:</strong> {new Date(request.processed_at).toLocaleString('pt-BR')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-primary" onClick={() => setShowRequestsModal(false)}>
+                    Fechar
                   </button>
                 </div>
               </div>
             </div>
           )}
+
+          {/* Registros Recentes (mantido igual) */}
+          <div className="recent-section">
+            <div className="section-header">
+              <FiClock size={24} />
+              <h3>Meus Últimos Registros</h3>
+            </div>
+            <div className="recent-list">
+              {recentRecords.length > 0 ? (
+                recentRecords.slice(0, 5).map(record => (
+                  <div key={record._id} className="recent-item">
+                    <div className="recent-item-content">
+                      <div className="recent-item-main">
+                        <div>
+                          <strong>
+                            {new Date(record.timestamp).toLocaleDateString('pt-BR')}
+                          </strong>
+                          <span> às </span>
+                          <strong>
+                            {new Date(record.timestamp).toLocaleTimeString('pt-BR')}
+                          </strong>
+                        </div>
+                        <span className={`record-type ${record.type}`}>
+                          {record.type === 'entry' ? 'ENTRADA' :
+                            record.type === 'pause' ? 'PAUSA' : 'SAÍDA'}
+                        </span>
+                      </div>
+                    </div>
+                    <FiArrowRight className="recent-item-arrow" size={16} />
+                  </div>
+                ))
+              ) : (
+                <div className="recent-item">
+                  <div className="recent-item-content">
+                    <span className="text-muted">Nenhum registro encontrado neste mês</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="info-card card">
+            <div className="section-header">
+              <FiInfo size={24} />
+              <h3>Como Usar o Sistema</h3>
+            </div>
+            <div className="info-content">
+              <div className="info-section">
+                <h4>
+                  <FiLogIn size={18} />
+                  Registro de Ponto
+                </h4>
+                <ul>
+                  <li><strong>Entrada:</strong> Ao chegar no trabalho</li>
+                  <li><strong>Pausa:</strong> Para almoço, café ou assuntos pessoais (com justificativa)</li>
+                  <li><strong>Retorno:</strong> Após pausas (botão "Retornar do Almoço")</li>
+                  <li><strong>Saída:</strong> Ao finalizar o expediente</li>
+                  <li><strong>Novo Turno:</strong> Se precisar registrar mais horas no mesmo dia</li>
+                </ul>
+              </div>
+
+              <div className="info-section">
+                <h4>Solicitações</h4>
+                <ul>
+                  <li>Use "Justificar Ausência" para faltas justificadas</li>
+                  <li>Use "Solicitar Ponto" para registrar horários esquecidos</li>
+                  <li>Acompanhe o status em "Ver Minhas Solicitações"</li>
+                  <li>O administrador pode adicionar observações na resposta</li>
+                </ul>
+              </div>
+
+              <div className="info-section">
+                <h4>Pausas</h4>
+                <ul>
+                  <li>Todas as pausas exigem justificativa</li>
+                  <li>Você pode fazer múltiplas pausas durante o dia</li>
+                  <li>Após cada pausa, clique em "Retornar do Almoço"</li>
+                  <li>As justificativas ficam registradas para controle</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </>
       ) : (
         <div className="info-card error-card">
@@ -866,10 +1074,14 @@ const EmployeeDashboard = () => {
             <FiAlertCircle size={24} />
             <h3>Funcionário Não Vinculado</h3>
           </div>
-          <p>Seu usuário não está vinculado a um funcionário válido. Contate o administrador.</p>
+          <p>Seu usuário não está vinculado a um funcionário no sistema.</p>
           <div className="quick-actions">
             <button className="btn btn-primary">
               <FiUser size={18} />
+              <span>Solicitar Vinculação</span>
+            </button>
+            <button className="btn btn-secondary">
+              <FiInfo size={18} />
               <span>Contatar Administrador</span>
             </button>
           </div>
