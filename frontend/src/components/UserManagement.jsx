@@ -344,11 +344,11 @@ const UserManagement = () => {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Username</th>
-                <th>Tipo</th>
+                <th><FiUser size={16} />Username</th>
+                <th><FiLock size={12} />Tipo</th>
                 <th>Funcionário Vinculado</th>
-                <th>Departamento</th>
-                <th>Data Criação</th>
+                <th><FiBriefcase size={12} />Departamento</th>
+                <th><FiCalendar size={14} />Data Criação</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -357,12 +357,10 @@ const UserManagement = () => {
                 <tr key={user._id}>
                   <td className="user-username">
                     <div className="user-info">
-                      <FiUser size={16} />
                       <div>
                         <strong>{user.username}</strong>
                         {user.username === 'admin' && (
                           <div className="admin-badge">
-                            <FiLock size={12} />
                             <span>Principal</span>
                           </div>
                         )}
@@ -376,11 +374,9 @@ const UserManagement = () => {
                     {user.employee ? (
                       <div className="employee-info">
                         <div className="employee-name">
-                          <FiUser size={14} />
                           <strong>{user.employee.name}</strong>
                         </div>
                         <div className="employee-email">
-                          <FiMail size={12} />
                           <span>{user.employee.email}</span>
                         </div>
                       </div>
@@ -391,7 +387,6 @@ const UserManagement = () => {
                   <td className="user-department">
                     {user.employee ? (
                       <span className="department-badge">
-                        <FiBriefcase size={12} />
                         {user.employee.department}
                       </span>
                     ) : (
@@ -400,7 +395,6 @@ const UserManagement = () => {
                   </td>
                   <td className="user-date">
                     <div className="date-info">
-                      <FiCalendar size={14} />
                       <span>{new Date(user.created_at).toLocaleDateString('pt-BR')}</span>
                     </div>
                   </td>
@@ -459,7 +453,7 @@ const UserManagement = () => {
           </table>
         </div>
 
-        {/* ALTERAÇÃO: Nova seção de dicas estilo reports */}
+        {/* Seção de dicas estilo reports */}
         <div className="user-management-tips">
           <div className="tips-header">
             <FiInfo className="header-icon" size={24} />

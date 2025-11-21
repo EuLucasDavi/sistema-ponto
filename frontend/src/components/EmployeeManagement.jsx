@@ -78,7 +78,7 @@ const EmployeeManagement = () => {
       } else {
         await axios.post('/api/employees', formData);
       }
-      
+
       handleCloseForm();
       fetchEmployees();
     } catch (err) {
@@ -170,7 +170,7 @@ const EmployeeManagement = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Email *</label>
                   <input
@@ -182,7 +182,7 @@ const EmployeeManagement = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Departamento *</label>
                   <input
@@ -194,7 +194,7 @@ const EmployeeManagement = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Salário Base (R$) *</label>
                   <input
@@ -221,7 +221,7 @@ const EmployeeManagement = () => {
                     <option value="paid_overtime">Hora Extra Paga</option>
                   </select>
                 </div>
-                
+
                 <div className="form-group">
                   <label>Data de Contratação *</label>
                   <input
@@ -247,7 +247,100 @@ const EmployeeManagement = () => {
           </div>
         </div>
       )}
-
+      <div className="main-content">
+        <div className="table-container card">
+          <div className="table-header">
+            <h3>Lista de Funcionários</h3>
+            <span className="table-count">{employees.length} funcionário(s)</span>
+          </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th><FiUser size={14} /> Nome</th>
+                <th><FiMail size={14} /> Email</th>
+                <th><FiBriefcase size={14} /> Departamento</th>
+                <th><FiDollarSign size={14} /> Salário</th>
+                <th><FiClock size={14} /> Excedente</th>
+                <th><FiCalendar size={14} /> Contratação</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {employees.map(employee => (
+                <tr key={employee._id}>
+                  <td className="employee-name">
+                    <div className="employee-info">
+                      <FiUser size={16} />
+                      <div>
+                        <strong>{employee.name}</strong>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="user-employee">
+                    {employee.email ? (
+                      <div className="employee-email">{employee.email}</div>
+                    ) : (
+                      <span className="text-muted">Não possui</span>
+                    )}
+                  </td>
+                  <td className="employee-department">
+                    {employee.department ? (
+                      <span className="department-badge">
+                        {employee.department}
+                      </span>
+                    ) : (
+                      <span className="text-muted">-</span>
+                    )}
+                  </td>
+                  <td className="employee-salary">
+                    R$ {employee.salary ? (
+                      parseFloat(employee.salary || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                    ) : (
+                      <span className="employee-salary">R$ - </span>)}
+                  </td>
+                  <td className="employee-date">{getOvertimeBadge(employee.overtime_format)}</td>
+                  <td>
+                    <div className="date-info">
+                      <span>{new Date(employee.hire_date).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  </td>
+                  <td className="employee-actions">
+                    <div className="action-buttons">
+                      <button
+                        className="btn btn-edit btn-small"
+                        onClick={() => handleEdit(employee)}
+                        title="Editar funcionário"
+                      >
+                        <FiEdit2 size={14} />
+                        <span>Editar</span>
+                      </button>
+                      <button
+                        className="btn btn-danger btn-small"
+                        onClick={() => handleDelete(employee._id)}
+                        title="Excluir funcionário"
+                      >
+                        <FiTrash2 size={14} />
+                        <span>Excluir</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {employees.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="empty-state">
+                    <div className="empty-content">
+                      <FiUsers size={48} />
+                      <h3>Nenhum funcionário cadastrado</h3>
+                      <p>Clique em "Novo Funcionário" para começar</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
       <div className="employee-table">
         <table>
           <thead>
@@ -281,7 +374,7 @@ const EmployeeManagement = () => {
                 </td>
                 <td className="employee-actions">
                   <div className="action-buttons">
-                    <button 
+                    <button
                       className="btn btn-edit btn-small"
                       onClick={() => handleEdit(employee)}
                       title="Editar funcionário"
@@ -289,7 +382,7 @@ const EmployeeManagement = () => {
                       <FiEdit2 size={14} />
                       <span>Editar</span>
                     </button>
-                    <button 
+                    <button
                       className="btn btn-danger btn-small"
                       onClick={() => handleDelete(employee._id)}
                       title="Excluir funcionário"
