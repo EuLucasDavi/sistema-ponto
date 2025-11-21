@@ -28,8 +28,7 @@ const EmployeeManagement = () => {
     department: '',
     salary: '',
     hire_date: '',
-    // 💡 NOVO CAMPO: Formato de hora extra/banco de horas
-    overtime_format: 'time_bank' 
+    overtime_format: 'time_bank'
   });
 
   useEffect(() => {
@@ -63,8 +62,7 @@ const EmployeeManagement = () => {
       department: employee.department,
       salary: employee.salary || '',
       hire_date: employee.hire_date ? new Date(employee.hire_date).toISOString().split('T')[0] : '',
-      // 💡 NOVO CAMPO: Carregar valor existente
-      overtime_format: employee.overtime_format || 'time_bank' 
+      overtime_format: employee.overtime_format || 'time_bank'
     });
     setShowForm(true);
   };
@@ -76,10 +74,8 @@ const EmployeeManagement = () => {
 
     try {
       if (editingEmployee) {
-        // Atualizar funcionário
         await axios.put(`/api/employees/${editingEmployee._id}`, formData);
       } else {
-        // Criar novo funcionário
         await axios.post('/api/employees', formData);
       }
       
@@ -113,8 +109,19 @@ const EmployeeManagement = () => {
       department: '',
       salary: '',
       hire_date: '',
-      overtime_format: 'time_bank' // Resetar para o padrão
+      overtime_format: 'time_bank'
     });
+  };
+
+  // Função auxiliar para formatar o badge de excedente
+  const getOvertimeBadge = (format) => {
+    const isTimeBank = format === 'time_bank';
+    return (
+      <span className={`overtime-badge ${format}`}>
+        <FiClock size={12} />
+        {isTimeBank ? 'Banco de Horas' : 'Hora Extra'}
+      </span>
+    );
   };
 
   return (
@@ -141,14 +148,17 @@ const EmployeeManagement = () => {
 
       {showForm && (
         <div className="modal-overlay">
-          <div className="modal">
+          <div className="modal-content">
             <div className="modal-header">
-              <h3>{editingEmployee ? 'Editar' : 'Novo'} Funcionário</h3>
-              <button className="btn-close-modal" onClick={handleCloseForm}><FiX size={20} /></button>
+              <h3>
+                {editingEmployee ? 'Editar' : 'Novo'} Funcionário
+              </h3>
+              <button className="btn-close-modal" onClick={handleCloseForm}>
+                <FiX size={20} />
+              </button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
-                
                 <div className="form-group">
                   <label>Nome Completo *</label>
                   <input
@@ -193,11 +203,12 @@ const EmployeeManagement = () => {
                     value={formData.salary}
                     onChange={handleChange}
                     placeholder="Ex: 3000.00"
+                    step="0.01"
+                    min="0"
                     required
                   />
                 </div>
 
-                {/* 💡 NOVO CAMPO: Formato de Excedente de Horas */}
                 <div className="form-group">
                   <label>Formato de Excedente de Horas *</label>
                   <select
@@ -245,7 +256,7 @@ const EmployeeManagement = () => {
               <th><FiMail size={14} /> Email</th>
               <th><FiBriefcase size={14} /> Depto</th>
               <th><FiDollarSign size={14} /> Salário</th>
-              <th><FiClock size={14} /> Excedente</th> 
+              <th><FiClock size={14} /> Excedente</th>
               <th><FiCalendar size={14} /> Contratação</th>
               <th>Ações</th>
             </tr>
@@ -253,12 +264,15 @@ const EmployeeManagement = () => {
           <tbody>
             {employees.map(employee => (
               <tr key={employee._id}>
-                <td>{employee.name}</td>
+                <td>
+                  <div className="employee-info">
+                    <strong>{employee.name}</strong>
+                  </div>
+                </td>
                 <td>{employee.email}</td>
                 <td>{employee.department}</td>
-                <td>R$ {parseFloat(employee.salary).toFixed(2)}</td>
-                {/* 💡 Novo campo na tabela */}
-                <td>{employee.overtime_format === 'time_bank' ? 'Banco de Horas' : 'Hora Extra'}</td>
+                <td>R$ {parseFloat(employee.salary || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                <td>{getOvertimeBadge(employee.overtime_format)}</td>
                 <td>
                   <div className="date-cell">
                     <FiCalendar size={14} />
