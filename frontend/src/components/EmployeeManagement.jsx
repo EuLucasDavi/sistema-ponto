@@ -398,11 +398,11 @@ const EmployeeManagement = () => {
                       <button
                         className="btn btn-danger btn-small"
                         onClick={() => handleDelete(employee._id)}
-                        title="Excluir funcionário"
+                        title="Tem nada Aqui"
                         disabled={loading}
                       >
                         <FiTrash2 size={14} />
-                        <span>Excluir</span>
+                        <span>Tem nada aqui</span>
                       </button>
                     </div>
                   </td>
