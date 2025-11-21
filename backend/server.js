@@ -696,12 +696,8 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       _id: new ObjectId(req.user.id)
     });
 
-    if (!user) {
-      return res.status(404).json({ error: 'Usuário não encontrado.' });
-    }
-
-    // 🔥 CORREÇÃO: Verificar se employee_id existe E é um ObjectId válido
-    const isEmployee = user.employee_id && ObjectId.isValid(user.employee_id);
+    // 🔥 Se o admin tiver employee_id vinculado, tratar como employee
+    const isEmployee = user.employee_id ? true : false;
 
     if (req.user.role === 'admin' && !isEmployee) {
       // Admin sem vínculo → dashboard administrativo
@@ -726,15 +722,11 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       });
     }
 
-    // 🔥 CORREÇÃO: Qualquer usuário com employee_id válido cai aqui
+    // 🔥 Qualquer usuário que POSSA bater ponto cai aqui
     if (isEmployee) {
       const employee = await db.collection('employees').findOne({
         _id: new ObjectId(user.employee_id)
       });
-
-      if (!employee) {
-        return res.status(404).json({ error: 'Funcionário vinculado não encontrado.' });
-      }
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -759,16 +751,15 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
       });
     }
 
-    // Usuário sem vínculo válido
+    // Usuário sem vínculo
     res.json({
-      role: user.role,
+      role: 'employee',
       employee: null,
       todayRecords: 0,
       recentRecords: []
     });
 
   } catch (error) {
-    console.error('❌ Erro no dashboard stats:', error);
     res.status(500).json({ error: error.message });
   }
 });
