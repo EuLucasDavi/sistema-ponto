@@ -125,7 +125,6 @@ const EmployeeManagement = () => {
     const isTimeBank = format === 'time_bank';
     return (
       <span className={`badge ${isTimeBank ? 'badge-time-bank' : 'badge-overtime'}`}>
-        <FiClock size={12} />
         {isTimeBank ? 'Banco de Horas' : 'Hora Extra'}
       </span>
     );
@@ -371,7 +370,7 @@ const EmployeeManagement = () => {
                   </td>
                   <td className="employee-salary">
                     {employee.salary ? (
-                      <>R$ {parseFloat(employee.salary || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>
+                      <>{parseFloat(employee.salary || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>
                     ) : (
                       <span className="text-muted">-</span>
                     )}

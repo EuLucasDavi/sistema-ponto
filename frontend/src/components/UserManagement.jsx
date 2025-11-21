@@ -344,11 +344,11 @@ const UserManagement = () => {
           <table className="data-table">
             <thead>
               <tr>
-                <th><FiUser size={16} />Username</th>
-                <th><FiLock size={12} />Tipo</th>
-                <th>Funcionário Vinculado</th>
-                <th><FiBriefcase size={12} />Departamento</th>
-                <th><FiCalendar size={14} />Data Criação</th>
+                <th><FiUser size={16} /> Username</th>
+                <th><FiLock size={12} /> Tipo</th>
+                <th>E-mail</th>
+                <th><FiBriefcase size={12} /> Departamento</th>
+                <th><FiCalendar size={14} /> Data Criação</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -373,9 +373,6 @@ const UserManagement = () => {
                   <td className="user-employee">
                     {user.employee ? (
                       <div className="employee-info">
-                        <div className="employee-name">
-                          <strong>{user.employee.name}</strong>
-                        </div>
                         <div className="employee-email">
                           <span>{user.employee.email}</span>
                         </div>
