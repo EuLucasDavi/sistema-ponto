@@ -168,44 +168,72 @@ const EmployeeDashboard = () => {
 
   // EmployeeDashboard.jsx
 
-const fetchTodayRecords = async () => {
-  try {
-    // --- CORREÇÃO DE FUSO HORÁRIO ---
-    const today = new Date();
-    // Pega ano, mês e dia locais (do computador do usuário)
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    
-    // Monta a string "YYYY-MM-DD" garantindo que seja o dia de hoje no Brasil
-    const todayStr = `${year}-${month}-${day}`;
-    // --------------------------------
+  const fetchTodayRecords = async () => {
+    try {
+      // 1. Define uma janela de tempo ampla (Ontem até Amanhã)
+      // Isso evita erros se o servidor achar que já é "amanhã" ou ainda é "ontem"
+      const today = new Date();
 
-    console.log("Buscando registros para data local:", todayStr); // Para debug no F12
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
 
-    const response = await axios.get('/api/me/time-records', {
-      params: {
-        start_date: todayStr,
-        end_date: todayStr
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // Formata para YYYY-MM-DD (usando horário local)
+      const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      console.log("Buscando registros entre:", formatDate(yesterday), "e", formatDate(tomorrow));
+
+      // 2. Faz a busca ampliada
+      const response = await axios.get('/api/me/time-records', {
+        params: {
+          start_date: formatDate(yesterday),
+          end_date: formatDate(tomorrow)
+        },
+        withCredentials: true // Importante para manter a sessão
+      });
+
+      // 3. Filtra no Frontend apenas os registros que são realmente de HOJE (localmente)
+      // Ou pegamos o ÚLTIMO registro absoluto para definir o status, que é o mais importante
+      const allRecords = response.data;
+
+      // Filtra visualmente para a lista apenas os de hoje
+      const todayStr = new Date().toLocaleDateString('pt-BR');
+      const recordsOnlyToday = allRecords.filter(rec =>
+        new Date(rec.timestamp).toLocaleDateString('pt-BR') === todayStr
+      );
+
+      setTodayRecordsList(recordsOnlyToday);
+
+      // 4. Define o STATUS com base no ÚLTIMO registro encontrado (independente do dia)
+      // Isso garante que se você deu entrada 23:59, continue "Em Trabalho" 00:01
+      if (allRecords.length > 0) {
+        // Ordena por data (garantia extra)
+        allRecords.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+        const lastRecordGlobal = allRecords[allRecords.length - 1];
+
+        console.log("Último registro recuperado:", lastRecordGlobal.type, "Horário:", lastRecordGlobal.timestamp);
+
+        setLastRecordType(lastRecordGlobal.type);
+        setLastRecord(lastRecordGlobal);
+      } else {
+        console.log("Nenhum registro encontrado na janela de 3 dias.");
+        setLastRecordType(null);
+        setLastRecord(null);
       }
-    });
 
-    setTodayRecordsList(response.data);
-
-    if (response.data.length > 0) {
-      const lastRecordToday = response.data[response.data.length - 1];
-      console.log("Último registro encontrado:", lastRecordToday.type); // Para debug
-      setLastRecordType(lastRecordToday.type);
-      setLastRecord(lastRecordToday); // Atualiza também o objeto completo se necessário
-    } else {
-      console.log("Nenhum registro encontrado para hoje.");
-      setLastRecordType(null);
+    } catch (error) {
+      console.error('Erro ao buscar registros:', error);
+      // Não resetamos para null aqui para não perder o estado visual se a net falhar
     }
-  } catch (error) {
-    console.error('Erro ao buscar registros de hoje:', error);
-    setLastRecordType(null);
-  }
-};
+  };
 
   const getButtonLabel = (action, todayRecordsList) => {
     switch (action.label_key) {
