@@ -70,6 +70,8 @@ const EmployeeManagement = () => {
       overtime_format: employee.overtime_format || 'time_bank'
     });
     setShowForm(true);
+    setError(''); // Limpa mensagens de erro e sucesso ao abrir formulário
+    setSuccess('');
   };
 
   const handleSubmit = async (e) => {
@@ -101,11 +103,14 @@ const EmployeeManagement = () => {
   const handleDelete = async (id) => {
     if (!window.confirm('Tem certeza que deseja excluir este funcionário?')) return;
     try {
+      setLoading(true);
       await axios.delete(`/api/employees/${id}`);
       setSuccess('Funcionário excluído com sucesso!');
       fetchEmployees();
     } catch (err) {
       setError(err.response?.data?.error || 'Erro ao excluir funcionário.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -127,10 +132,11 @@ const EmployeeManagement = () => {
   // Função auxiliar para formatar o badge de excedente
   const getOvertimeBadge = (format) => {
     const isTimeBank = format === 'time_bank';
+    // Utilizando classes customizadas para padronizar com UserManagement
     return (
-      <span className={`badge ${isTimeBank ? 'badge-time-bank' : 'badge-overtime'}`}>
+      <span className={`badge ${isTimeBank ? 'badge-employee' : 'badge-admin'}`}>
         <FiClock size={12} />
-        {isTimeBank ? 'Banco de Horas' : 'Hora Extra'}
+        <span>{isTimeBank ? 'Banco de Horas' : 'Hora Extra Paga'}</span>
       </span>
     );
   };
@@ -142,7 +148,7 @@ const EmployeeManagement = () => {
           <FiUsers className="header-icon" size={32} />
           <div>
             <h1>Gestão de Funcionários</h1>
-            <p className="text-muted">Adicione, edite e remova funcionários do sistema.</p>
+            <p>Adicione, edite e remova funcionários do sistema.</p>
           </div>
         </div>
         <button 
@@ -150,7 +156,7 @@ const EmployeeManagement = () => {
           onClick={() => setShowForm(true)}
           disabled={loading}
         >
-          <FiUserPlus size={18} />
+          <FiUserPlus size={20} />
           <span>Novo Funcionário</span>
         </button>
       </div>
@@ -200,7 +206,7 @@ const EmployeeManagement = () => {
                 <div className="form-group">
                   <label>
                     <FiUser size={16} />
-                    Nome Completo *
+                    Nome Completo
                   </label>
                   <input
                     type="text"
@@ -216,7 +222,7 @@ const EmployeeManagement = () => {
                 <div className="form-group">
                   <label>
                     <FiMail size={16} />
-                    Email *
+                    Email
                   </label>
                   <input
                     type="email"
@@ -232,7 +238,7 @@ const EmployeeManagement = () => {
                 <div className="form-group">
                   <label>
                     <FiBriefcase size={16} />
-                    Departamento *
+                    Departamento
                   </label>
                   <input
                     type="text"
@@ -248,7 +254,7 @@ const EmployeeManagement = () => {
                 <div className="form-group">
                   <label>
                     <FiDollarSign size={16} />
-                    Salário Base (R$) *
+                    Salário Base (R$)
                   </label>
                   <input
                     type="number"
@@ -266,7 +272,7 @@ const EmployeeManagement = () => {
                 <div className="form-group">
                   <label>
                     <FiClock size={16} />
-                    Formato de Excedente de Horas *
+                    Formato de Excedente de Horas
                   </label>
                   <select
                     name="overtime_format"
@@ -283,7 +289,7 @@ const EmployeeManagement = () => {
                 <div className="form-group">
                   <label>
                     <FiCalendar size={16} />
-                    Data de Contratação *
+                    Data de Contratação
                   </label>
                   <input
                     type="date"
@@ -350,21 +356,21 @@ const EmployeeManagement = () => {
             <tbody>
               {employees.map(employee => (
                 <tr key={employee._id}>
-                  <td className="employee-name">
-                    <div className="employee-info">
+                  <td className="user-name">
+                    <div className="user-info">
                       <div>
                         <strong>{employee.name}</strong>
                       </div>
                     </div>
                   </td>
-                  <td className="employee-email">
+                  <td className="user-email">
                     {employee.email ? (
                       <div className="employee-email">{employee.email}</div>
                     ) : (
                       <span className="text-muted">Não possui</span>
                     )}
                   </td>
-                  <td className="employee-department">
+                  <td className="user-department">
                     {employee.department ? (
                       <span className="department-badge">
                         {employee.department}
@@ -373,26 +379,27 @@ const EmployeeManagement = () => {
                       <span className="text-muted">-</span>
                     )}
                   </td>
-                  <td className="employee-salary">
+                  <td className="user-salary">
                     R$ {employee.salary ? (
                       parseFloat(employee.salary || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
                     ) : (
                       <span className="text-muted">-</span>
                     )}
                   </td>
-                  <td className="employee-overtime">
+                  <td className="user-overtime">
                     {getOvertimeBadge(employee.overtime_format)}
                   </td>
-                  <td className="employee-date">
+                  <td className="user-date">
                     <div className="date-info">
                       <span>{new Date(employee.hire_date).toLocaleDateString('pt-BR')}</span>
                     </div>
                   </td>
-                  <td className="employee-actions">
+                  <td className="user-actions">
                     <div className="action-buttons">
                       <button
                         className="btn btn-edit btn-small"
                         onClick={() => handleEdit(employee)}
+                        disabled={loading}
                         title="Editar funcionário"
                       >
                         <FiEdit2 size={14} />
@@ -401,6 +408,7 @@ const EmployeeManagement = () => {
                       <button
                         className="btn btn-danger btn-small"
                         onClick={() => handleDelete(employee._id)}
+                        disabled={loading}
                         title="Excluir funcionário"
                       >
                         <FiTrash2 size={14} />
@@ -426,7 +434,7 @@ const EmployeeManagement = () => {
         </div>
 
         {/* Seção de dicas estilo UserManagement */}
-        <div className="employee-management-tips">
+        <div className="user-management-tips">
           <div className="tips-header">
             <FiInfo className="header-icon" size={24} />
             <h3>Dicas de Gestão de Funcionários</h3>
