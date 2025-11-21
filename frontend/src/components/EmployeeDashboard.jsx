@@ -245,6 +245,24 @@ const EmployeeDashboard = () => {
     }
   };
 
+  const getStatusMessage = (lastRecordType, availableActions) => {
+    if (!lastRecordType || lastRecordType === 'exit') {
+      return '🟡 Aguardando entrada (Início do Turno)';
+    }
+
+    if (lastRecordType === 'pause') {
+      return '🟠 Em Pausa (Aguardando Reentrada)';
+    }
+
+    const isWorking = availableActions.some(action => action.type === 'pause' || action.type === 'exit');
+
+    if (lastRecordType === 'entry' && isWorking) {
+      return '🟢 Em Trabalho';
+    }
+
+    return '🔴 Expediente Encerrado';
+  };
+
   // ATUALIZADA: Registrar ponto com modais de confirmação
   const registerTime = async (type, pauseReason = null) => {
     setRegisterLoading(true);
@@ -458,10 +476,9 @@ const EmployeeDashboard = () => {
               <div className="work-status">
                 <div className={`status-indicator ${lastRecordType || 'waiting'}`}>
                   <strong>Status Atual: </strong>
-                  {!lastRecordType && '🟡 Aguardando entrada'}
-                  {lastRecordType === 'entry' && '🟢 Em trabalho'}
-                  {lastRecordType === 'pause' && '🟠 Em pausa'}
-                  {lastRecordType === 'exit' && '🔴 Expediente encerrado'}
+                  <span>
+                    {getStatusMessage(lastRecordType, availableActions)}
+                  </span>
                 </div>
               </div>
               <div className="current-time">
@@ -481,15 +498,11 @@ const EmployeeDashboard = () => {
               <div className="time-buttons">
                 {availableActions.map(action => (
                   <button
-                    // Usa a label_key como chave única
                     key={action.label_key}
-                    // Usa a propriedade 'color' definida na função getAvailableActions
                     className={`btn btn-${action.color} btn-large`}
-                    // Se for pausa, abre o modal, senão chama registerTime com o tipo correto ('entry', 'pause' ou 'exit')
                     onClick={() => action.type === 'pause' ? setShowPauseModal(true) : registerTime(action.type)}
                     disabled={registerLoading}
                   >
-                    {/* 1. Estado de Carregamento (Loading) */}
                     {registerLoading ? (
                       <>
                         <div className="loading-spinner"></div>
@@ -497,12 +510,10 @@ const EmployeeDashboard = () => {
                       </>
                     ) : (
                       <>
-                        {/* 2. Ícone baseado no tipo de registro */}
                         {action.type === 'entry' && <FiLogIn size={20} />}
                         {action.type === 'pause' && <FiPauseCircle size={20} />}
                         {action.type === 'exit' && <FiLogOut size={20} />}
 
-                        {/* 3. Rótulo correto usando a função auxiliar e a label_key */}
                         <span>{getButtonLabel(action.label_key)}</span>
                       </>
                     )}
