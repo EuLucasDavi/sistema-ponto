@@ -229,19 +229,19 @@ const EmployeeDashboard = () => {
 
   const getAvailableActions = (currentLastRecordType) => {
     if (!currentLastRecordType || currentLastRecordType === 'exit') {
-      return [{ type: 'entry', label_key: 'entry_start' }];
+      return [{ type: 'entry', label_key: 'entry_start', color: 'success' }];
     }
 
     switch (currentLastRecordType) {
       case 'entry':
         return [
-          { type: 'pause', label_key: 'pause' },
-          { type: 'exit', label_key: 'exit' }
+          { type: 'pause', label_key: 'pause', color: 'warning' },
+          { type: 'exit', label_key: 'exit', color: 'danger' }
         ];
       case 'pause':
-        return [{ type: 'entry', label_key: 'entry_return' }];
+        return [{ type: 'entry', label_key: 'entry_return', color: 'success' }];
       default:
-        return [{ type: 'entry', label_key: 'entry_start' }];
+        return [{ type: 'entry', label_key: 'entry_start', color: 'success' }];
     }
   };
 
@@ -367,8 +367,6 @@ const EmployeeDashboard = () => {
     }
   };
 
-  // ... (restante das funções getStatusBadge, getTypeBadge permanecem iguais)
-
   const getStatusBadge = (status) => {
     const statusConfig = {
       pending: { class: 'warning', text: 'Pendente', icon: <FiClock size={14} /> },
@@ -423,11 +421,8 @@ const EmployeeDashboard = () => {
         </div>
       </div>
 
-      {/* REMOVIDO: Mensagem de erro no topo - agora usamos modais */}
-
       {employeeData ? (
         <>
-          {/* Grid de Estatísticas (mantido igual) */}
           <div className="stats-grid">
             <div className="stat-card">
               <div className="stat-icon">
@@ -470,7 +465,6 @@ const EmployeeDashboard = () => {
             </div>
           </div>
 
-          {/* Time Clock (mantido igual) */}
           <div className="time-clock-container">
             <div className="time-clock-card">
               <div className="work-status">
