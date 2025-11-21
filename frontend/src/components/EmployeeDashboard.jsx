@@ -207,6 +207,22 @@ const fetchTodayRecords = async () => {
   }
 };
 
+  const getButtonLabel = (action, todayRecordsList) => {
+    switch (action.label_key) {
+      case 'entry_start':
+        return 'Registrar Entrada';
+      case 'entry_return':
+        const pauseCount = todayRecordsList.filter(record => record.type === 'pause').length;
+        return pauseCount === 1 ? 'Retornar do Almoço' : 'Retornar da Pausa';
+      case 'pause':
+        return 'Iniciar Pausa';
+      case 'exit':
+        return 'Registrar Saída';
+      default:
+        return 'Registrar';
+    }
+  };
+
   const getAvailableActions = (currentLastRecordType) => {
     // Se null ou 'exit', mostra Entrada
     if (!currentLastRecordType || currentLastRecordType === 'exit') {
