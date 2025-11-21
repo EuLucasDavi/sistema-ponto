@@ -212,55 +212,73 @@ const EmployeeDashboard = () => {
     }
   };
 
-  const getButtonLabel = (actionKey) => {
-    switch (actionKey) {
+  const getButtonLabel = (action, todayRecords) => {
+    switch (action.label_key) {
       case 'entry_start':
         return 'Registrar Entrada';
       case 'entry_return':
-        return 'Retornar da Pausa'; // ou 'Reentrada', mais descritivo para o usuário
+        // Conta quantas pausas já foram feitas hoje para determinar o texto
+        const pauseCount = todayRecords.filter(record => record.type === 'pause').length;
+        return pauseCount === 1 ? 'Retornar do Almoço' : 'Retornar da Pausa';
       case 'pause':
-        return 'Pausa';
+        return 'Iniciar Pausa';
       case 'exit':
         return 'Registrar Saída';
       default:
-        return 'Registrar Entrada';
+        return 'Registrar';
     }
   };
 
-  const getAvailableActions = (currentLastRecordType) => {
-    if (!currentLastRecordType || currentLastRecordType === 'exit') {
+  const getAvailableActions = (currentLastRecordType, todayRecords) => {
+    // Se não há registros hoje, só pode fazer entrada
+    if (!todayRecords || todayRecords.length === 0) {
       return [{ type: 'entry', label_key: 'entry_start', color: 'success' }];
     }
 
-    switch (currentLastRecordType) {
+    const lastRecord = todayRecords[todayRecords.length - 1];
+
+    // Lógica baseada no último registro
+    switch (lastRecord.type) {
       case 'entry':
+        // Após entrada: pode pausar ou sair
         return [
           { type: 'pause', label_key: 'pause', color: 'warning' },
           { type: 'exit', label_key: 'exit', color: 'danger' }
         ];
+
       case 'pause':
+        // Após pausa: pode retornar (nova entrada)
         return [{ type: 'entry', label_key: 'entry_return', color: 'success' }];
+
+      case 'exit':
+        // Após saída: pode iniciar novo turno (nova entrada)
+        return [{ type: 'entry', label_key: 'entry_start', color: 'success' }];
+
       default:
         return [{ type: 'entry', label_key: 'entry_start', color: 'success' }];
     }
   };
 
-  const getStatusMessage = (lastRecordType, availableActions) => {
-    if (!lastRecordType || lastRecordType === 'exit') {
+  const getStatusMessage = (lastRecordType, todayRecords) => {
+    if (!todayRecords || todayRecords.length === 0) {
       return '🟡 Aguardando entrada (Início do Turno)';
     }
 
-    if (lastRecordType === 'pause') {
-      return '🟠 Em Pausa (Aguardando Reentrada)';
+    const lastRecord = todayRecords[todayRecords.length - 1];
+
+    switch (lastRecord.type) {
+      case 'entry':
+        return '🟢 Em Trabalho';
+
+      case 'pause':
+        return '🟠 Em Pausa';
+
+      case 'exit':
+        return '🔴 Expediente Encerrado';
+
+      default:
+        return '🟡 Status Desconhecido';
     }
-
-    const isWorking = availableActions.some(action => action.type === 'pause' || action.type === 'exit');
-
-    if (lastRecordType === 'entry' && isWorking) {
-      return '🟢 Em Trabalho';
-    }
-
-    return '🔴 Expediente Encerrado';
   };
 
   // ATUALIZADA: Registrar ponto com modais de confirmação
@@ -398,7 +416,8 @@ const EmployeeDashboard = () => {
     );
   };
 
-  const availableActions = getAvailableActions(lastRecordType);
+  const availableActions = getAvailableActions(lastRecordType, todayRecordsList);
+  const statusMessage = getStatusMessage(lastRecordType, todayRecordsList);
   const pendingRequestsCount = myRequests.filter(req => req.status === 'pending').length;
 
   if (loading) {
@@ -470,9 +489,7 @@ const EmployeeDashboard = () => {
               <div className="work-status">
                 <div className={`status-indicator ${lastRecordType || 'waiting'}`}>
                   <strong>Status Atual: </strong>
-                  <span>
-                    {getStatusMessage(lastRecordType, availableActions)}
-                  </span>
+                  <span>{statusMessage}</span>
                 </div>
               </div>
               <div className="current-time">
@@ -507,8 +524,7 @@ const EmployeeDashboard = () => {
                         {action.type === 'entry' && <FiLogIn size={20} />}
                         {action.type === 'pause' && <FiPauseCircle size={20} />}
                         {action.type === 'exit' && <FiLogOut size={20} />}
-
-                        <span>{getButtonLabel(action.label_key)}</span>
+                        <span>{getButtonLabel(action, todayRecordsList)}</span>
                       </>
                     )}
                   </button>

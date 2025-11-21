@@ -163,81 +163,105 @@ const minutesToTime = (totalMinutes) => {
   return `${sign}${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 };
 
+// Substitua a função calculateDailySummary por esta versão corrigida:
 const calculateDailySummary = (records) => {
   let totalWorkMinutes = 0;
   let totalPauseMinutes = 0;
-  let clock = {
-    entry: null,
-    pause: null,
-    return: null,
-    exit: null
-  };
+  let currentWorkStart = null;
+  let currentPauseStart = null;
   const pauses = [];
+  
+  // Estrutura para o espelho do dia
+  const dailyClock = {
+    entries: [],
+    pauses: [],
+    exits: []
+  };
 
   if (!records || records.length === 0) {
-    return { totalWorkMinutes, totalPauseMinutes, pauses, dailyClock: {} };
+    return { totalWorkMinutes, totalPauseMinutes, pauses, dailyClock };
   }
 
-  // Garante que os registros estejam ordenados por timestamp
+  // Ordena os registros por timestamp
   records.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-  // Lógica principal: calcular blocos de trabalho e pausas
-  for (let i = 0; i < records.length; i++) {
-    const record = records[i];
+  // Processa cada registro
+  for (const record of records) {
     const timestamp = new Date(record.timestamp);
 
-    // 1. Entrada (Início do dia ou Início após Pausa)
-    if (record.type === 'entry' && !clock.entry) {
-      clock.entry = timestamp;
-    }
+    // Classifica o registro para o espelho
+    if (record.type === 'entry') dailyClock.entries.push(timestamp);
+    else if (record.type === 'pause') dailyClock.pauses.push(timestamp);
+    else if (record.type === 'exit') dailyClock.exits.push(timestamp);
 
-    // 2. Pausa (Marca o fim do bloco de trabalho e início da pausa)
-    else if (record.type === 'pause' && clock.entry) {
-      clock.pause = timestamp;
-      // Tempo trabalhado antes da pausa
-      totalWorkMinutes += (clock.pause.getTime() - clock.entry.getTime()) / (1000 * 60);
-      clock.entry = null;
-
+    // Lógica de cálculo de tempo
+    if (record.type === 'entry') {
+      if (currentPauseStart) {
+        // Finaliza pausa
+        const pauseEnd = timestamp;
+        totalPauseMinutes += (pauseEnd.getTime() - currentPauseStart.getTime()) / (1000 * 60);
+        
+        // Registra a pausa completa
+        if (pauses.length > 0) {
+          pauses[pauses.length - 1].end = pauseEnd;
+        }
+        
+        currentPauseStart = null;
+      }
+      currentWorkStart = timestamp;
+    } 
+    else if (record.type === 'pause') {
+      if (currentWorkStart) {
+        // Finaliza bloco de trabalho
+        const workEnd = timestamp;
+        totalWorkMinutes += (workEnd.getTime() - currentWorkStart.getTime()) / (1000 * 60);
+        currentWorkStart = null;
+      }
+      currentPauseStart = timestamp;
+      
+      // Inicia nova pausa
       pauses.push({
         reason: record.pause_reason_id || 'Outro',
         description: record.custom_reason || '',
-        start: clock.pause
+        start: timestamp,
+        end: null // Será preenchido quando a pausa terminar
       });
     }
-
-    // 3. Retorno (Marca o fim da pausa e reinício do trabalho)
-    else if (record.type === 'entry' && clock.pause) {
-      clock.return = timestamp;
-      // Tempo de pausa
-      totalPauseMinutes += (clock.return.getTime() - clock.pause.getTime()) / (1000 * 60);
-
-      // Reestabelece o início do trabalho
-      clock.entry = clock.return;
-      clock.pause = null;
-      clock.return = null;
-
-      // Registra o fim da pausa
-      if (pauses.length > 0) {
-        pauses[pauses.length - 1].end = timestamp;
+    else if (record.type === 'exit') {
+      if (currentWorkStart) {
+        // Finaliza bloco de trabalho
+        const workEnd = timestamp;
+        totalWorkMinutes += (workEnd.getTime() - currentWorkStart.getTime()) / (1000 * 60);
+        currentWorkStart = null;
       }
-    }
-
-    // 4. Saída (Marca o fim do dia)
-    else if (record.type === 'exit' && clock.entry) {
-      clock.exit = timestamp;
-      // Tempo trabalhado final
-      totalWorkMinutes += (clock.exit.getTime() - clock.entry.getTime()) / (1000 * 60);
-      clock.entry = null;
+      if (currentPauseStart) {
+        // Pausa não finalizada - considera até a saída
+        const pauseEnd = timestamp;
+        totalPauseMinutes += (pauseEnd.getTime() - currentPauseStart.getTime()) / (1000 * 60);
+        
+        if (pauses.length > 0) {
+          pauses[pauses.length - 1].end = pauseEnd;
+        }
+        
+        currentPauseStart = null;
+      }
     }
   }
 
-  // Estrutura do ponto principal do dia (para o espelho)
-  const dailyClock = {
-    entry: records.find(r => r.type === 'entry')?.timestamp,
-    pause: records.find(r => r.type === 'pause')?.timestamp,
-    return: records.filter(r => r.type === 'entry')[1]?.timestamp,
-    exit: records.find(r => r.type === 'exit')?.timestamp,
-  };
+  // Processa tempos pendentes no final do dia
+  const endOfDay = new Date(records[records.length - 1].timestamp);
+  endOfDay.setHours(23, 59, 59, 999);
+  
+  if (currentWorkStart) {
+    totalWorkMinutes += (endOfDay.getTime() - currentWorkStart.getTime()) / (1000 * 60);
+  }
+  if (currentPauseStart) {
+    totalPauseMinutes += (endOfDay.getTime() - currentPauseStart.getTime()) / (1000 * 60);
+    
+    if (pauses.length > 0) {
+      pauses[pauses.length - 1].end = endOfDay;
+    }
+  }
 
   return { totalWorkMinutes, totalPauseMinutes, pauses, dailyClock };
 };
