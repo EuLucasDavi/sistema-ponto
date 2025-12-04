@@ -1461,7 +1461,7 @@ body {
   }
   
   .container {
-    padding: 20px;
+    padding-left: 10%;
   }
   
   .layout {
@@ -1472,7 +1472,7 @@ body {
     width: 280px;
     order: 0;
     transform: translateX(0);
-    position: relative;
+    position: fixed;
     height: 100vh;
   }
   
