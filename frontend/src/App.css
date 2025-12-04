@@ -491,7 +491,6 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  scrollbar-width: thin;
 }
 
 .sidebar-open {
@@ -651,9 +650,6 @@ body {
   height: 70px;
   flex-wrap: wrap;
   min-height: 70px;
-  position: sticky;
-  top: 0;
-  z-index: 999;
 }
 
 .navbar-left {
@@ -1463,7 +1459,7 @@ body {
   html {
     font-size: 16px;
   }
-
+  
   .container {
     padding: 20px;
   }
@@ -1476,12 +1472,11 @@ body {
     width: 280px;
     order: 0;
     transform: translateX(0);
-    position: fixed;
+    position: fixed;   /* DEIXA FIXA NO DESKTOP */
     top: 0;
     left: 0;
-    height: 100vh;
-    overflow-y: auto;
-    z-index: 1000;
+    height: 100vh;     /* Mantém preenchendo a tela */
+    overflow-y: auto;  /* Scroll interno */
   }
   
   .header {
