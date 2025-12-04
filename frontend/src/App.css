@@ -73,7 +73,6 @@ body {
   margin: 0 auto;
   padding: 20px;
   animation: fadeIn 0.5s ease-in-out;
-  margin-top: 70px; /* ADICIONAR: compensa altura da navbar */
 }
 
 .layout {
@@ -1862,10 +1861,6 @@ body {
     margin-left: 0; /* GARANTIR que no mobile não tem margin */
     width: 100%; /* GARANTIR */
     position: sticky; /* Ou fixed se preferir fixo no mobile */
-  }
-
-  .container {
-    margin-top: 60px; /* Ajuste fino para mobile */
   }
 }
 
