@@ -650,7 +650,6 @@ body {
   height: 70px;
   flex-wrap: wrap;
   min-height: 70px;
-  margin-left: 280px;
 }
 
 .navbar-left {
@@ -1461,6 +1460,10 @@ body {
     font-size: 16px;
   }
   
+  .container {
+    padding: 20px;
+  }
+  
   .layout {
     flex-direction: row;
   }
@@ -1469,8 +1472,8 @@ body {
     width: 280px;
     order: 0;
     transform: translateX(0);
-    position: fixed;
-    height: 100vh;
+    position: relative;
+    height: auto;
   }
   
   .header {
