@@ -1468,13 +1468,13 @@ body {
     flex-direction: row;
   }
   
-  /* .sidebar {
+  .sidebar {
     width: 280px;
     order: 0;
     transform: translateX(0);
-    position: relative;
+    position: fixed;
     height: auto;
-  } */
+  }
   
   .header {
     flex-direction: row;
