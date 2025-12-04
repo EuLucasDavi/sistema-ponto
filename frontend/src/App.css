@@ -1553,7 +1553,10 @@ body {
 }
 
 .report-buttons {
+  display: flex;
   gap: 10%;
+  justify-content: center;
+  align-items: center;
 }
 
 .record-badge.entry { color: #28a745; }
