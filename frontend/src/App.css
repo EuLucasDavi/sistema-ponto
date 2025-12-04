@@ -73,6 +73,7 @@ body {
   margin: 0 auto;
   padding: 20px;
   animation: fadeIn 0.5s ease-in-out;
+  margin-top: 70px; /* ADICIONAR: compensa altura da navbar */
 }
 
 .layout {
@@ -650,6 +651,9 @@ body {
   height: 70px;
   flex-wrap: wrap;
   min-height: 70px;
+  position: sticky;
+  top: 0;
+  z-index: 999;
 }
 
 .navbar-left {
@@ -1470,10 +1474,24 @@ body {
   
   .sidebar {
     width: 280px;
+    background: linear-gradient(135deg, #2c3e50, #34495e);
+    color: white;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
     order: 0;
-    transform: translateX(0);
-    position: relative;
-    height: auto;
+    position: fixed; /* ADICIONAR */
+    top: 0; /* ADICIONAR */
+    left: 0; /* ADICIONAR */
+    z-index: 1000;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(0); /* GARANTIR */
+  }
+
+  .main-content {
+    margin-left: 280px; /* ADICIONAR: compensa sidebar fixa */
+    width: calc(100% - 280px); /* ADICIONAR */
   }
   
   .header {
@@ -1499,7 +1517,11 @@ body {
   }
   
   .navbar {
-    padding: 0 30px;
+    position: sticky; /* ADICIONAR */
+    top: 0; /* ADICIONAR */
+    z-index: 999; /* ADICIONAR */
+    margin-left: 280px; /* ADICIONAR: compensa sidebar */
+    width: calc(100% - 280px); /* ADICIONAR */
   }
   
   .login-container {
@@ -1834,6 +1856,16 @@ body {
   
   .stats-sidebar {
     flex-direction: column;
+  }
+
+  .navbar {
+    margin-left: 0; /* GARANTIR que no mobile não tem margin */
+    width: 100%; /* GARANTIR */
+    position: sticky; /* Ou fixed se preferir fixo no mobile */
+  }
+
+  .container {
+    margin-top: 60px; /* Ajuste fino para mobile */
   }
 }
 
