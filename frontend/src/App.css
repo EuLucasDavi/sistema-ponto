@@ -2215,6 +2215,10 @@ body {
   .user-info .user-details {
     display: none;
   }
+
+  .navbar-user .btn-logout-desktop {
+    display: none;
+  }
   
   .btn-logout-desktop span {
     display: none;
@@ -2589,6 +2593,10 @@ body {
   .form-container.card {
     margin: 20px;
     max-height: 85vh;
+  }
+
+  .navbar-user .btn-logout-desktop {
+    display: none;
   }
 }
 
