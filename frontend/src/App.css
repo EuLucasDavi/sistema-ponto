@@ -86,6 +86,7 @@ body {
   flex: 1;
   background: #f8f9fa;
   width: 100%;
+  margin-top: 70px;
 }
 
 /* ===== COMPONENTES COMUNS ===== */
@@ -641,7 +642,7 @@ body {
 
 /* Navbar */
 .navbar {
-  background: white;
+  background: #ffffff;
   padding: 0 20px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   display: flex;
@@ -650,7 +651,15 @@ body {
   height: 70px;
   flex-wrap: wrap;
   min-height: 70px;
+
+  /* FIXAÇÃO GLOBAL */
   position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+
+  /* FICA ATRÁS DA SIDEBAR */
+  z-index: 900;
 }
 
 .navbar-left {
@@ -1474,8 +1483,16 @@ body {
     order: 0;
     transform: translateX(0);
     position: fixed;
-    height: auto;
+    top: 0;
+    left: 0;
+    width: 280px;
+    height: 100vh;
     overflow-y: auto;
+    z-index: 1000;
+  }
+
+  .main-content {
+    margin-left: 20%;
   }
   
   .header {
