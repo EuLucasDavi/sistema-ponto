@@ -650,6 +650,7 @@ body {
   height: 70px;
   flex-wrap: wrap;
   min-height: 70px;
+  position: fixed;
 }
 
 .navbar-left {
@@ -1472,11 +1473,9 @@ body {
     width: 280px;
     order: 0;
     transform: translateX(0);
-    position: fixed;   /* DEIXA FIXA NO DESKTOP */
-    top: 0;
-    left: 0;
-    height: 100vh;     /* Mantém preenchendo a tela */
-    overflow-y: auto;  /* Scroll interno */
+    position: fixed;
+    height: auto;
+    overflow-y: auto;
   }
   
   .header {
