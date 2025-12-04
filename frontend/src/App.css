@@ -1552,6 +1552,10 @@ body {
   text-align: center;
 }
 
+.report-buttons {
+  gap: 10%;
+}
+
 .record-badge.entry { color: #28a745; }
 .record-badge.pause { color: #ffc107; }
 .record-badge.exit { color: #dc3545; }
