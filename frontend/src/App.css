@@ -1463,10 +1463,6 @@ body {
   html {
     font-size: 16px;
   }
-  
-  .main-content {
-    margin-left: 280px;   /* Afasta o conteúdo para não ficar atrás da sidebar */
-  }
 
   .container {
     padding: 20px;
