@@ -73,7 +73,6 @@ body {
   margin: 0 auto;
   padding: 20px;
   animation: fadeIn 0.5s ease-in-out;
-  margin-top: 70px; /* ADICIONADO: compensa altura da navbar fixa */
 }
 
 .layout {
@@ -651,9 +650,6 @@ body {
   height: 70px;
   flex-wrap: wrap;
   min-height: 70px;
-  position: sticky; /* ALTERADO: agora é sticky */
-  top: 0; /* ADICIONADO: fixa no topo */
-  z-index: 999; /* ADICIONADO: fica acima do conteúdo */
 }
 
 .navbar-left {
@@ -1476,17 +1472,8 @@ body {
     width: 280px;
     order: 0;
     transform: translateX(0);
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 280px;
-    height: 100vh;
-    overflow-y: auto;
-    z-index: 1000;
-  }
-
-  .main-content {
-    margin-left: 10%;
+    position: relative;
+    height: auto;
   }
   
   .header {
