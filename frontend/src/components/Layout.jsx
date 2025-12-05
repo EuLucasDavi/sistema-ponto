@@ -187,13 +187,6 @@ const Layout = ({ children }) => {
                 </div>
               </div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="btn btn-secondary btn-logout-desktop"
-            >
-              <FiLogOut size={16} />
-              <span>Sair</span>
-            </button>
           </div>
         </header>
 
