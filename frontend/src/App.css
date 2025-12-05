@@ -2105,18 +2105,65 @@ body {
   
   .container {
     padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    animation: fadeIn 0.5s ease-in-out;
+    width: 100%;
   }
   
   .layout {
-    flex-direction: row;
+    display: flex;
+    min-height: 100vh;
+    flex-direction: row; /* Muda para linha em desktop */
+    height: 100vh; /* Altura total da viewport */
+    overflow: hidden; /* Remove scroll do container principal */
   }
   
+  /* Sidebar fixa */
   .sidebar {
     width: 280px;
     order: 0;
     transform: translateX(0);
-    position: relative;
-    height: auto;
+    position: relative; /* Mantém relativo */
+    height: 100vh; /* Altura total */
+    overflow-y: auto; /* Scroll interno se necessário */
+    flex-shrink: 0; /* Não encolhe */
+    z-index: 1000; /* Mantém acima */
+  }
+  
+  /* Navbar fixa */
+  .navbar {
+    position: sticky; /* Adiciona sticky */
+    top: 0; /* Fixa no topo da área de conteúdo */
+    z-index: 100; /* Garante que fique acima */
+    background: white;
+    padding: 0 30px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 70px;
+    flex-wrap: wrap;
+    min-height: 70px;
+    flex-shrink: 0; /* Não encolhe */
+  }
+  
+  /* Container principal que vai rolar */
+  .main-content {
+    flex: 1;
+    min-width: 0;
+    background: #f8f9fa;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto; /* Apenas o conteúdo rola */
+    height: 100vh; /* Altura total */
+  }
+  
+  /* Mantém o restante das regras responsivas */
+  .mobile-menu-btn,
+  .sidebar-overlay {
+    display: none;
   }
   
   .header {
@@ -2141,10 +2188,6 @@ body {
     flex-direction: row;
   }
   
-  .navbar {
-    padding: 0 30px;
-  }
-  
   .login-container {
     max-width: 400px;
     margin: 100px auto;
@@ -2158,11 +2201,6 @@ body {
   
   .stat-number {
     font-size: 2.5em;
-  }
-  
-  .mobile-menu-btn,
-  .sidebar-overlay {
-    display: none;
   }
 }
 
